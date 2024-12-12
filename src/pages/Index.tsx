@@ -2,6 +2,7 @@ import React from 'react';
 import { Card } from "@/components/ui/card";
 import { ModbusCalculator } from '@/components/ModbusCalculator';
 import { PacketVisualizer } from '@/components/PacketVisualizer';
+import { ModbusConnection } from '@/components/ModbusConnection';
 
 const Index = () => {
   return (
@@ -15,6 +16,8 @@ const Index = () => {
             Calculate Modbus RTU polling times and analyze packet structures
           </p>
         </header>
+
+        <ModbusConnection />
 
         <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
           <Card className="bg-gray-800/50 backdrop-blur border-gray-700/50 p-6 shadow-xl hover:shadow-2xl transition-shadow duration-300">
