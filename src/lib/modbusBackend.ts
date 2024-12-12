@@ -2,6 +2,33 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
 
+export interface ModbusSettings {
+  port: string;
+  baudRate: number;
+  parity: 'N' | 'E' | 'O';
+  stopBits: number;
+  dataBits: number;
+  timeout: number;
+}
+
+export interface ModbusRequest {
+  name: string;
+  function: number;
+  startAddress: number;
+  count: number;
+  slaveId?: number;
+  data?: number[];
+  comment?: string;
+}
+
+export interface ModbusResponse {
+  requestHex: string;
+  responseHex: string;
+  parsedData: number[] | boolean[];
+  timestamp: string;
+  error?: string;
+}
+
 export interface ModbusBackendService {
   getAvailablePorts: () => Promise<string[]>;
   connect: (settings: ModbusSettings) => Promise<boolean>;
