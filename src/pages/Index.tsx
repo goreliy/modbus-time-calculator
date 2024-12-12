@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ModbusCalculator } from '@/components/ModbusCalculator';
 import { PacketVisualizer } from '@/components/PacketVisualizer';
 import { ModbusConnection } from '@/components/ModbusConnection';
+import { ModbusDataVisualizer } from '@/components/ModbusDataVisualizer';
 
 const Index = () => {
+  const [modbusData, setModbusData] = useState<Array<number | boolean>>([]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -17,7 +20,7 @@ const Index = () => {
           </p>
         </header>
 
-        <ModbusConnection />
+        <ModbusConnection onDataReceived={setModbusData} />
 
         <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
           <Card className="bg-gray-800/50 backdrop-blur border-gray-700/50 p-6 shadow-xl hover:shadow-2xl transition-shadow duration-300">
@@ -28,6 +31,10 @@ const Index = () => {
             <PacketVisualizer />
           </Card>
         </div>
+
+        {modbusData.length > 0 && (
+          <ModbusDataVisualizer data={modbusData} title="Received Modbus Data" />
+        )}
       </div>
     </div>
   );

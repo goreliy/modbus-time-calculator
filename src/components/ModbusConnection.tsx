@@ -4,9 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ModbusService, ModbusSettings } from '@/lib/modbusService';
+import { ModbusService, ModbusSettings, ModbusRequest } from '@/lib/modbusService';
 
-export const ModbusConnection = () => {
+interface ModbusConnectionProps {
+  onDataReceived?: (data: Array<number | boolean>) => void;
+}
+
+export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   const [ports, setPorts] = useState<string[]>([]);
   const [settings, setSettings] = useState<ModbusSettings>({
     port: '',
@@ -17,6 +21,14 @@ export const ModbusConnection = () => {
     timeout: 1000
   });
   const [isConnected, setIsConnected] = useState(false);
+  const [request, setRequest] = useState<ModbusRequest>({
+    name: 'Test Request',
+    function: 3,
+    startAddress: 0,
+    count: 10,
+    slaveId: 1,
+    comment: 'Read 10 holding registers'
+  });
 
   const modbusService = ModbusService.getInstance();
 
@@ -39,6 +51,18 @@ export const ModbusConnection = () => {
     } else {
       const success = await modbusService.connect(settings);
       setIsConnected(success);
+    }
+  };
+
+  const handleSendRequest = async () => {
+    try {
+      const response = await modbusService.sendRequest(request);
+      console.log('Modbus response:', response);
+      if (response.parsedData && onDataReceived) {
+        onDataReceived(response.parsedData);
+      }
+    } catch (error) {
+      console.error('Error sending request:', error);
     }
   };
 
@@ -145,14 +169,76 @@ export const ModbusConnection = () => {
               max={5000}
             />
           </div>
+
         </div>
 
-        <Button
-          className={`w-full ${isConnected ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
-          onClick={handleConnect}
-        >
-          {isConnected ? 'Disconnect' : 'Connect'}
-        </Button>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <div className="space-y-2">
+            <Label>Function Code</Label>
+            <Select
+              value={request.function.toString()}
+              onValueChange={(value) => setRequest(prev => ({ ...prev, function: parseInt(value) }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select function" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 - Read Coils</SelectItem>
+                <SelectItem value="2">2 - Read Discrete Inputs</SelectItem>
+                <SelectItem value="3">3 - Read Holding Registers</SelectItem>
+                <SelectItem value="4">4 - Read Input Registers</SelectItem>
+                <SelectItem value="5">5 - Write Single Coil</SelectItem>
+                <SelectItem value="6">6 - Write Single Register</SelectItem>
+                <SelectItem value="15">15 - Write Multiple Coils</SelectItem>
+                <SelectItem value="16">16 - Write Multiple Registers</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Start Address</Label>
+            <Input
+              type="number"
+              value={request.startAddress}
+              onChange={(e) => setRequest(prev => ({ ...prev, startAddress: parseInt(e.target.value) }))}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Count</Label>
+            <Input
+              type="number"
+              value={request.count}
+              onChange={(e) => setRequest(prev => ({ ...prev, count: parseInt(e.target.value) }))}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Slave ID</Label>
+            <Input
+              type="number"
+              value={request.slaveId}
+              onChange={(e) => setRequest(prev => ({ ...prev, slaveId: parseInt(e.target.value) }))}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-4">
+          <Button
+            className={`flex-1 ${isConnected ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+            onClick={handleConnect}
+          >
+            {isConnected ? 'Disconnect' : 'Connect'}
+          </Button>
+
+          <Button
+            className="flex-1 bg-blue-500 hover:bg-blue-600"
+            onClick={handleSendRequest}
+            disabled={!isConnected}
+          >
+            Send Request
+          </Button>
+        </div>
       </div>
     </Card>
   );
