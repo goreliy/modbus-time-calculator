@@ -39,36 +39,40 @@ export const ModbusCalculator = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold mb-4">Modbus Calculator</h2>
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+        Modbus Calculator
+      </h2>
       
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label>Number of Channels ({numChannels})</Label>
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <Label className="text-gray-200">Number of Channels ({numChannels})</Label>
           <Slider
             value={[numChannels]}
             onValueChange={(value) => setNumChannels(value[0])}
             min={1}
             max={512}
             step={1}
+            className="my-4"
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Channels with Changes ({numChangedChannels})</Label>
+        <div className="space-y-3">
+          <Label className="text-gray-200">Channels with Changes ({numChangedChannels})</Label>
           <Slider
             value={[numChangedChannels]}
             onValueChange={(value) => setNumChangedChannels(value[0])}
             min={0}
             max={numChannels}
             step={1}
+            className="my-4"
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Baud Rate</Label>
+        <div className="space-y-3">
+          <Label className="text-gray-200">Baud Rate</Label>
           <Select value={baudRate} onValueChange={setBaudRate}>
-            <SelectTrigger>
+            <SelectTrigger className="bg-gray-700/50 border-gray-600">
               <SelectValue placeholder="Select baud rate" />
             </SelectTrigger>
             <SelectContent>
@@ -81,21 +85,22 @@ export const ModbusCalculator = () => {
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label>Packet Interval (bytes) ({packetInterval})</Label>
+        <div className="space-y-3">
+          <Label className="text-gray-200">Packet Interval (bytes) ({packetInterval})</Label>
           <Slider
             value={[packetInterval]}
             onValueChange={(value) => setPacketInterval(value[0])}
             min={1}
             max={20}
             step={1}
+            className="my-4"
           />
         </div>
 
-        <Card className="bg-gray-700 p-4">
+        <Card className="bg-gradient-to-br from-blue-900 to-purple-900 p-6 shadow-lg">
           <div className="text-center">
-            <p className="text-sm text-gray-300">Total Polling Time</p>
-            <p className="text-2xl font-bold">{totalTime.toFixed(2)} ms</p>
+            <p className="text-sm text-gray-300 mb-2">Total Polling Time</p>
+            <p className="text-3xl font-bold text-white">{totalTime.toFixed(2)} ms</p>
           </div>
         </Card>
       </div>
