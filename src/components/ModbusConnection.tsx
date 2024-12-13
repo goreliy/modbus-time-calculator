@@ -10,6 +10,8 @@ import { ModbusHistory } from './ModbusHistory';
 import { SavedModbusSettings, SavedModbusRequest, saveSettings, loadSettings, saveRequests, loadRequests } from '@/lib/storage';
 import { toast } from 'sonner';
 
+const HISTORY_KEY = 'modbus_history';
+
 interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
 }
@@ -39,6 +41,17 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     const savedRequests = loadRequests();
     if (savedRequests) {
       setRequests(savedRequests);
+    }
+    // Загружаем сохранённую историю
+    const savedHistory = localStorage.getItem(HISTORY_KEY);
+    if (savedHistory) {
+      try {
+        const parsedHistory = JSON.parse(savedHistory);
+        setHistory(parsedHistory);
+        console.log('Loaded saved history:', parsedHistory);
+      } catch (error) {
+        console.error('Error loading history:', error);
+      }
     }
   }, []);
 
@@ -80,13 +93,21 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   const handleSendRequest = async (request: SavedModbusRequest) => {
     try {
       const response = await modbusService.sendRequest(request);
-      setHistory(prev => [{
+      const newHistoryEntry = {
         timestamp: new Date().toISOString(),
         requestHex: response.requestHex,
         responseHex: response.responseHex,
         requestName: request.name,
         error: response.error
-      }, ...prev]);
+      };
+
+      setHistory(prev => {
+        const newHistory = [newHistoryEntry, ...prev];
+        // Сохраняем обновлённую историю
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
+        console.log('Updated history:', newHistory);
+        return newHistory;
+      });
 
       if (!response.error && onDataReceived) {
         onDataReceived(response.parsedData);

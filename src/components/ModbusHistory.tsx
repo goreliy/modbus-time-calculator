@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,7 +15,18 @@ interface ModbusHistoryProps {
   history: ModbusHistoryEntry[];
 }
 
+const HISTORY_KEY = 'modbus_history';
+
 export const ModbusHistory = ({ history }: ModbusHistoryProps) => {
+  useEffect(() => {
+    if (history.length > 0) {
+      // Сохраняем историю в localStorage, ограничивая её 1000 записями
+      const limitedHistory = history.slice(0, 1000);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(limitedHistory));
+      console.log('History saved:', limitedHistory);
+    }
+  }, [history]);
+
   const formatHexString = (hex: string): string => {
     return hex.match(/.{1,2}/g)?.join(' ') || hex;
   };
