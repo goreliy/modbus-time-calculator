@@ -16,6 +16,7 @@ export interface SavedModbusRequest {
   slaveId: number;
   data?: number[];
   comment?: string;
+  order: number;  // Added order property
 }
 
 const SETTINGS_KEY = 'modbus_settings';
