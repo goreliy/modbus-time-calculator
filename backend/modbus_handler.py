@@ -27,12 +27,14 @@ class ModbusRequest:
     slave_id: int = 1
     data: Optional[List[int]] = None
     comment: Optional[str] = None
+    order: int = 0  # Added order field
 
 class ModbusHandler:
     def __init__(self):
         self.serial = None
         self._lock = threading.Lock()
         self._crc16_table = self._generate_crc16_table()
+        self._stop_polling = threading.Event()
 
     def _generate_crc16_table(self):
         table = []
@@ -101,7 +103,10 @@ class ModbusHandler:
         with self._lock:
             try:
                 if not self.serial or not self.serial.is_open:
-                    raise Exception("Not connected")
+                    return {
+                        "error": "Not connected",
+                        "timestamp": datetime.now().isoformat()
+                    }
 
                 # Формируем запрос
                 data = bytearray([request.slave_id, request.function])
@@ -134,10 +139,22 @@ class ModbusHandler:
                     time.sleep(0.001)
                 
                 if not response:
-                    raise TimeoutError("No response received")
+                    return {
+                        "error": "Timeout: No response received",
+                        "request_hex": data.hex(),
+                        "timestamp": datetime.now().isoformat()
+                    }
                 
                 # Парсим ответ
-                parsed_data = self._parse_response(bytes(response), request.function)
+                try:
+                    parsed_data = self._parse_response(bytes(response), request.function)
+                except Exception as e:
+                    return {
+                        "error": f"Parse error: {str(e)}",
+                        "request_hex": data.hex(),
+                        "response_hex": response.hex(),
+                        "timestamp": datetime.now().isoformat()
+                    }
                 
                 return {
                     "request_hex": data.hex(),
@@ -152,6 +169,40 @@ class ModbusHandler:
                     "request_hex": data.hex() if 'data' in locals() else None,
                     "timestamp": datetime.now().isoformat()
                 }
+
+    def start_polling(self, requests: List[ModbusRequest], interval: float, cycles: Optional[int] = None) -> None:
+        """
+        Start polling multiple requests in sequence
+        :param requests: List of ModbusRequest objects
+        :param interval: Time between requests in seconds
+        :param cycles: Number of polling cycles (None for infinite)
+        """
+        self._stop_polling.clear()
+        cycle_count = 0
+        
+        while not self._stop_polling.is_set():
+            if cycles is not None:
+                if cycle_count >= cycles:
+                    break
+                cycle_count += 1
+            
+            # Sort requests by order
+            sorted_requests = sorted(requests, key=lambda x: x.order)
+            
+            for request in sorted_requests:
+                if self._stop_polling.is_set():
+                    break
+                    
+                response = self.send_request(request)
+                print(f"Poll response for {request.name}: {response}")
+                
+                # Wait for the specified interval
+                if not self._stop_polling.is_set():
+                    time.sleep(interval)
+
+    def stop_polling(self) -> None:
+        """Stop the polling loop"""
+        self._stop_polling.set()
 
     def _parse_response(self, response: bytes, function: int) -> Union[List[bool], List[int]]:
         if len(response) < 5:

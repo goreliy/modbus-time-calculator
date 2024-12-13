@@ -30,10 +30,27 @@ export const ModbusRequestManager = ({
       startAddress: 0,
       count: 1,
       slaveId: 1,
-      comment: ''
+      comment: '',
+      order: requests.length // Add order field
     };
     onRequestsChange([...requests, newRequest]);
     setEditingIndex(requests.length);
+  };
+
+  const moveRequest = (index: number, direction: 'up' | 'down') => {
+    const newRequests = [...requests];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    if (newIndex >= 0 && newIndex < requests.length) {
+      // Swap orders
+      const temp = newRequests[index].order;
+      newRequests[index].order = newRequests[newIndex].order;
+      newRequests[newIndex].order = temp;
+      
+      // Swap positions in array
+      [newRequests[index], newRequests[newIndex]] = [newRequests[newIndex], newRequests[index]];
+      onRequestsChange(newRequests);
+    }
   };
 
   const updateRequest = (index: number, updates: Partial<SavedModbusRequest>) => {
@@ -140,6 +157,22 @@ export const ModbusRequestManager = ({
             </div>
 
             <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => moveRequest(index, 'up')}
+                disabled={disabled || index === 0}
+              >
+                ↑
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => moveRequest(index, 'down')}
+                disabled={disabled || index === requests.length - 1}
+              >
+                ↓
+              </Button>
               <Button
                 variant="destructive"
                 size="sm"

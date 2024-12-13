@@ -17,6 +17,7 @@ export interface ModbusRequest {
   data?: number[];
   comment?: string;
   slaveId?: number;
+  order?: number;
 }
 
 export interface ModbusResponse {
@@ -25,6 +26,12 @@ export interface ModbusResponse {
   parsedData: number[] | boolean[];
   timestamp: string;
   error?: string;
+}
+
+export interface PollingSettings {
+  requests: ModbusRequest[];
+  interval: number;
+  cycles?: number;
 }
 
 export class ModbusService {
@@ -57,5 +64,13 @@ export class ModbusService {
 
   async sendRequest(request: ModbusRequest): Promise<ModbusResponse> {
     return await this.backendService.sendRequest(request);
+  }
+
+  async startPolling(settings: PollingSettings): Promise<void> {
+    await this.backendService.startPolling(settings);
+  }
+
+  async stopPolling(): Promise<void> {
+    await this.backendService.stopPolling();
   }
 }

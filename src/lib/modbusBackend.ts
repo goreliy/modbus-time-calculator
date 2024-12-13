@@ -19,6 +19,7 @@ export interface ModbusRequest {
   slaveId?: number;
   data?: number[];
   comment?: string;
+  order?: number;
 }
 
 export interface ModbusResponse {
@@ -29,11 +30,19 @@ export interface ModbusResponse {
   error?: string;
 }
 
+export interface PollingSettings {
+  requests: ModbusRequest[];
+  interval: number;
+  cycles?: number;
+}
+
 export interface ModbusBackendService {
   getAvailablePorts: () => Promise<string[]>;
   connect: (settings: ModbusSettings) => Promise<boolean>;
   disconnect: () => Promise<void>;
   sendRequest: (request: ModbusRequest) => Promise<ModbusResponse>;
+  startPolling: (settings: PollingSettings) => Promise<void>;
+  stopPolling: () => Promise<void>;
 }
 
 export class ModbusBackendServiceImpl implements ModbusBackendService {
@@ -88,6 +97,26 @@ export class ModbusBackendServiceImpl implements ModbusBackendService {
       return response.data;
     } catch (error) {
       console.error('Request error:', error);
+      throw error;
+    }
+  }
+
+  async startPolling(settings: PollingSettings): Promise<void> {
+    try {
+      await axios.post(`${API_BASE_URL}/start-polling`, settings);
+      console.log('Polling started');
+    } catch (error) {
+      console.error('Start polling error:', error);
+      throw error;
+    }
+  }
+
+  async stopPolling(): Promise<void> {
+    try {
+      await axios.post(`${API_BASE_URL}/stop-polling`);
+      console.log('Polling stopped');
+    } catch (error) {
+      console.error('Stop polling error:', error);
       throw error;
     }
   }
