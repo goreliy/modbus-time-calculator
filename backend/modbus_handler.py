@@ -27,7 +27,7 @@ class ModbusRequest:
     slave_id: int = 1
     data: Optional[List[int]] = None
     comment: Optional[str] = None
-    order: int = 0  # Added order field
+    order: int = 0
 
 class ModbusHandler:
     def __init__(self):
@@ -37,44 +37,13 @@ class ModbusHandler:
         self._stop_polling = threading.Event()
 
     def _generate_crc16_table(self):
-        table = []
-        for i in range(256):
-            crc = 0
-            c = i
-            for j in range(8):
-                if (crc ^ c) & 0x0001:
-                    crc = (crc >> 1) ^ 0xA001
-                else:
-                    crc = crc >> 1
-                c = c >> 1
-            table.append(crc)
-        return table
+        # ... keep existing code (CRC table generation)
 
     def _calculate_crc(self, data: bytes) -> int:
-        crc = 0xFFFF
-        for byte in data:
-            crc = (crc >> 8) ^ self._crc16_table[(crc ^ byte) & 0xFF]
-        return crc
+        # ... keep existing code (CRC calculation)
 
     def get_available_ports(self) -> List[str]:
-        if platform.system() == "Windows":
-            return [port.device for port in serial.tools.list_ports.comports()]
-        else:
-            ports = []
-            try:
-                # Получаем список USB устройств
-                result = subprocess.run(['lsusb'], capture_output=True, text=True)
-                
-                # Проверяем ttyUSB и ttyACM устройства
-                for dev_pattern in ['/dev/ttyUSB*', '/dev/ttyACM*']:
-                    try:
-                        result = subprocess.run(['ls', dev_pattern], capture_output=True, text=True)
-                        ports.extend([p for p in result.stdout.split('\n') if p])
-                    except:
-                        continue
-            except Exception as e:
-                print(f"Error listing ports: {str(e)}")
-            return ports
+        # ... keep existing code (port listing)
 
     def connect(self, settings: ModbusSettings) -> bool:
         try:
@@ -124,17 +93,21 @@ class ModbusHandler:
                 crc = self._calculate_crc(data)
                 data.extend(struct.pack('<H', crc))
                 
+                # Clear input buffer before sending
+                self.serial.reset_input_buffer()
+                
                 # Отправляем запрос
                 self.serial.write(data)
                 
-                # Читаем ответ
+                # Читаем ответ с таймаутом
                 response = bytearray()
                 start_time = time.time()
                 
                 while (time.time() - start_time) < self.serial.timeout:
                     if self.serial.in_waiting:
-                        response.extend(self.serial.read(self.serial.in_waiting))
-                        if len(response) >= 5:
+                        new_data = self.serial.read(self.serial.in_waiting)
+                        response.extend(new_data)
+                        if len(response) >= 5:  # Minimum response length
                             break
                     time.sleep(0.001)
                 
@@ -148,6 +121,12 @@ class ModbusHandler:
                 # Парсим ответ
                 try:
                     parsed_data = self._parse_response(bytes(response), request.function)
+                    return {
+                        "request_hex": data.hex(),
+                        "response_hex": response.hex(),
+                        "parsed_data": parsed_data,
+                        "timestamp": datetime.now().isoformat()
+                    }
                 except Exception as e:
                     return {
                         "error": f"Parse error: {str(e)}",
@@ -156,53 +135,12 @@ class ModbusHandler:
                         "timestamp": datetime.now().isoformat()
                     }
                 
-                return {
-                    "request_hex": data.hex(),
-                    "response_hex": response.hex(),
-                    "parsed_data": parsed_data,
-                    "timestamp": datetime.now().isoformat()
-                }
-                
             except Exception as e:
                 return {
                     "error": str(e),
                     "request_hex": data.hex() if 'data' in locals() else None,
                     "timestamp": datetime.now().isoformat()
                 }
-
-    def start_polling(self, requests: List[ModbusRequest], interval: float, cycles: Optional[int] = None) -> None:
-        """
-        Start polling multiple requests in sequence
-        :param requests: List of ModbusRequest objects
-        :param interval: Time between requests in seconds
-        :param cycles: Number of polling cycles (None for infinite)
-        """
-        self._stop_polling.clear()
-        cycle_count = 0
-        
-        while not self._stop_polling.is_set():
-            if cycles is not None:
-                if cycle_count >= cycles:
-                    break
-                cycle_count += 1
-            
-            # Sort requests by order
-            sorted_requests = sorted(requests, key=lambda x: x.order)
-            
-            for request in sorted_requests:
-                if self._stop_polling.is_set():
-                    break
-                    
-                response = self.send_request(request)
-                print(f"Poll response for {request.name}: {response}")
-                
-                # Wait for the specified interval
-                if not self._stop_polling.is_set():
-                    time.sleep(interval)
-
-    def stop_polling(self) -> None:
-        """Stop the polling loop"""
-        self._stop_polling.set()
 
     def _parse_response(self, response: bytes, function: int) -> Union[List[bool], List[int]]:
         if len(response) < 5:
@@ -248,3 +186,28 @@ class ModbusHandler:
         
         else:
             raise ValueError(f"Unsupported function: {function}")
+
+    def start_polling(self, requests: List[ModbusRequest], interval: float, cycles: Optional[int] = None) -> None:
+        self._stop_polling.clear()
+        cycle_count = 0
+        
+        while not self._stop_polling.is_set():
+            if cycles is not None:
+                if cycle_count >= cycles:
+                    break
+                cycle_count += 1
+            
+            sorted_requests = sorted(requests, key=lambda x: x.order)
+            
+            for request in sorted_requests:
+                if self._stop_polling.is_set():
+                    break
+                    
+                response = self.send_request(request)
+                print(f"Poll response for {request.name}: {response}")
+                
+                if not self._stop_polling.is_set():
+                    time.sleep(interval)
+
+    def stop_polling(self) -> None:
+        self._stop_polling.set()
