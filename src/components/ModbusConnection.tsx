@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ModbusService } from '@/lib/modbusService';
-import { SavedModbusSettings, SavedModbusRequest, saveSettings, loadSettings, saveRequests, loadRequests } from '@/lib/storage';
+import { SavedModbusSettings, SavedModbusRequest, saveSettings, loadSettings } from '@/lib/storage';
 import { toast } from 'sonner';
 import { ConnectionSettings } from './modbus/ConnectionSettings';
 import { ModbusRequestManager } from './ModbusRequestManager';
 import { ModbusHistory } from './ModbusHistory';
+import { useModbusRequests } from '@/hooks/useModbusRequests';
+import { useModbusHistory } from '@/hooks/useModbusHistory';
 
 interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
@@ -21,35 +23,26 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     timeout: 1000
   });
   const [isConnected, setIsConnected] = useState(false);
-  const [requests, setRequests] = useState<SavedModbusRequest[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  
+  const { requests, handleRequestsChange } = useModbusRequests();
+  const { history, addHistoryEntry } = useModbusHistory();
 
   const modbusService = ModbusService.getInstance();
 
   useEffect(() => {
     loadPorts();
-    loadSavedData();
+    loadSavedSettings();
   }, []);
 
-  const loadSavedData = () => {
+  const loadSavedSettings = () => {
     try {
       const savedSettings = loadSettings();
       if (savedSettings) {
         setSettings(savedSettings);
       }
-
-      const savedRequests = loadRequests();
-      if (savedRequests) {
-        setRequests(savedRequests);
-      }
-
-      const savedHistory = localStorage.getItem('modbus_history');
-      if (savedHistory) {
-        setHistory(JSON.parse(savedHistory));
-      }
     } catch (error) {
-      console.error('Error loading saved data:', error);
-      toast.error('Failed to load saved data');
+      console.error('Error loading saved settings:', error);
+      toast.error('Failed to load saved settings');
     }
   };
 
@@ -96,18 +89,12 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       const response = await modbusService.sendRequest(request);
       console.log('Received response:', response);
 
-      const newHistoryEntry = {
+      addHistoryEntry({
         timestamp: new Date().toISOString(),
         requestHex: response.requestHex || '',
         responseHex: response.responseHex || '',
         requestName: request.name,
         error: response.error || null
-      };
-
-      setHistory(prev => {
-        const newHistory = [newHistoryEntry, ...prev].slice(0, 1000);
-        localStorage.setItem('modbus_history', JSON.stringify(newHistory));
-        return newHistory;
       });
 
       if (response.error) {
@@ -123,27 +110,13 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast.error(`Failed to send request: ${errorMessage}`);
       
-      setHistory(prev => {
-        const newHistory = [{
-          timestamp: new Date().toISOString(),
-          requestHex: '',
-          responseHex: '',
-          requestName: request.name,
-          error: errorMessage
-        }, ...prev].slice(0, 1000);
-        localStorage.setItem('modbus_history', JSON.stringify(newHistory));
-        return newHistory;
+      addHistoryEntry({
+        timestamp: new Date().toISOString(),
+        requestHex: '',
+        responseHex: '',
+        requestName: request.name,
+        error: errorMessage
       });
-    }
-  };
-
-  const handleRequestsChange = (newRequests: SavedModbusRequest[]) => {
-    try {
-      setRequests(newRequests);
-      saveRequests(newRequests);
-    } catch (error) {
-      console.error('Error saving requests:', error);
-      toast.error('Failed to save requests');
     }
   };
 
