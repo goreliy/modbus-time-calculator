@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ModbusService } from '@/lib/modbusService';
 import { SavedModbusSettings, SavedModbusRequest, saveSettings, loadSettings } from '@/lib/storage';
 import { toast } from 'sonner';
@@ -7,7 +7,9 @@ import { ModbusRequestManager } from './ModbusRequestManager';
 import { ModbusHistory } from './ModbusHistory';
 import { useModbusRequests } from '@/hooks/useModbusRequests';
 import { useModbusHistory } from '@/hooks/useModbusHistory';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Download, Upload } from 'lucide-react';
+import { Button } from './ui/button';
+import { saveToExcel, loadFromExcel } from '@/lib/excelUtils';
 
 interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
@@ -30,6 +32,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   const { history, addHistoryEntry } = useModbusHistory();
 
   const modbusService = ModbusService.getInstance();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadPorts();
@@ -135,6 +138,45 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     }
   };
 
+  const handleExportConfig = () => {
+    try {
+      saveToExcel(settings, requests);
+      toast.success('Configuration exported successfully');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export configuration');
+    }
+  };
+
+  const handleImportConfig = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    try {
+      const { settings: newSettings, requests: newRequests } = await loadFromExcel(file);
+      
+      if (newSettings) {
+        setSettings(prev => ({ ...prev, ...newSettings }));
+        saveSettings(newSettings as SavedModbusSettings);
+      }
+      
+      if (newRequests) {
+        handleRequestsChange(newRequests);
+      }
+      
+      toast.success('Configuration imported successfully');
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error('Failed to import configuration');
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="space-y-6 relative">
       {isLoading && (
@@ -143,6 +185,32 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         </div>
       )}
       
+      <div className="flex justify-end gap-2 mb-4">
+        <Button
+          variant="outline"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-2"
+        >
+          <Upload className="h-4 w-4" />
+          Import Config
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleExportConfig}
+          className="flex items-center gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export Config
+        </Button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImportConfig}
+          accept=".xlsx"
+          className="hidden"
+        />
+      </div>
+
       <ConnectionSettings
         ports={ports}
         settings={settings}
