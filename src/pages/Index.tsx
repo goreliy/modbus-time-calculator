@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { Card } from "@/components/ui/card";
-import { PacketVisualizer } from '@/components/PacketVisualizer';
 import { ModbusConnection } from '@/components/ModbusConnection';
 import { ModbusDataVisualizer } from '@/components/ModbusDataVisualizer';
+import { ModbusRequestManager } from '@/components/ModbusRequestManager';
+import { SavedModbusRequest, loadRequests, saveRequests } from '@/lib/storage';
 
 const Index = () => {
   const [modbusData, setModbusData] = useState<Array<number | boolean>>([]);
+  const [requests, setRequests] = useState<SavedModbusRequest[]>(loadRequests());
+
+  const handleRequestsChange = (newRequests: SavedModbusRequest[]) => {
+    setRequests(newRequests);
+    saveRequests(newRequests);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4 md:p-8">
@@ -19,7 +25,17 @@ const Index = () => {
           </p>
         </header>
 
-        <ModbusConnection onDataReceived={setModbusData} />
+        <ModbusRequestManager
+          requests={requests}
+          onRequestsChange={handleRequestsChange}
+          onSendRequest={(request) => console.log('Send request:', request)}
+        />
+
+        <ModbusConnection 
+          onDataReceived={setModbusData}
+          requests={requests}
+          onRequestsChange={handleRequestsChange}
+        />
 
         {modbusData.length > 0 && (
           <ModbusDataVisualizer data={modbusData} title="Received Modbus Data" />
