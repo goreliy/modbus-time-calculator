@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
-import { ModbusCalculator } from '@/components/ModbusCalculator';
 import { PacketVisualizer } from '@/components/PacketVisualizer';
 import { ModbusConnection } from '@/components/ModbusConnection';
 import { ModbusDataVisualizer } from '@/components/ModbusDataVisualizer';
@@ -13,24 +12,14 @@ const Index = () => {
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-            S2000PP Modbus Calculator
+            S2000PP Modbus Tool
           </h1>
           <p className="text-gray-400 text-lg md:text-xl">
-            Calculate Modbus RTU polling times and analyze packet structures
+            Configure and monitor Modbus RTU communications
           </p>
         </header>
 
         <ModbusConnection onDataReceived={setModbusData} />
-
-        <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
-          <Card className="bg-gray-800/50 backdrop-blur border-gray-700/50 p-6 shadow-xl hover:shadow-2xl transition-shadow duration-300">
-            <ModbusCalculator />
-          </Card>
-          
-          <Card className="bg-gray-800/50 backdrop-blur border-gray-700/50 p-6 shadow-xl hover:shadow-2xl transition-shadow duration-300">
-            <PacketVisualizer />
-          </Card>
-        </div>
 
         {modbusData.length > 0 && (
           <ModbusDataVisualizer data={modbusData} title="Received Modbus Data" />

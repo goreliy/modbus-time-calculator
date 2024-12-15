@@ -18,6 +18,7 @@ export interface ModbusRequest {
   comment?: string;
   slaveId?: number;
   order?: number;
+  cycles?: number;
 }
 
 export interface ModbusResponse {

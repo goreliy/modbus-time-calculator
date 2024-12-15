@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SavedModbusRequest } from '@/lib/storage';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ModbusRequestManagerProps {
   requests: SavedModbusRequest[];
@@ -14,6 +15,47 @@ interface ModbusRequestManagerProps {
   disabled?: boolean;
 }
 
+const getCountExplanation = (functionCode: number): string => {
+  switch (functionCode) {
+    case 1:
+    case 2:
+      return "Number of coils/discrete inputs to read";
+    case 3:
+    case 4:
+      return "Number of registers to read (2 bytes each)";
+    case 5:
+      return "Always 1 - single coil write";
+    case 6:
+      return "Always 1 - single register write";
+    case 15:
+      return "Number of coils to write";
+    case 16:
+      return "Number of registers to write";
+    default:
+      return "Number of items to process";
+  }
+};
+
+const formatRequestBytes = (request: SavedModbusRequest): string => {
+  const bytes: number[] = [
+    request.slaveId,
+    request.function,
+    Math.floor(request.startAddress / 256),
+    request.startAddress % 256,
+  ];
+
+  if (request.function === 5 || request.function === 6) {
+    const value = request.data?.[0] || 0;
+    bytes.push(Math.floor(value / 256));
+    bytes.push(value % 256);
+  } else {
+    bytes.push(Math.floor(request.count / 256));
+    bytes.push(request.count % 256);
+  }
+
+  return bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+};
+
 export const ModbusRequestManager = ({
   requests,
   onRequestsChange,
@@ -21,6 +63,7 @@ export const ModbusRequestManager = ({
   disabled
 }: ModbusRequestManagerProps) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [cycles, setCycles] = useState<number | undefined>(undefined);
 
   const addNewRequest = () => {
     const newRequest: SavedModbusRequest = {
@@ -31,26 +74,11 @@ export const ModbusRequestManager = ({
       count: 1,
       slaveId: 1,
       comment: '',
-      order: requests.length // Add order field
+      order: requests.length,
+      cycles: 1
     };
     onRequestsChange([...requests, newRequest]);
     setEditingIndex(requests.length);
-  };
-
-  const moveRequest = (index: number, direction: 'up' | 'down') => {
-    const newRequests = [...requests];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    
-    if (newIndex >= 0 && newIndex < requests.length) {
-      // Swap orders
-      const temp = newRequests[index].order;
-      newRequests[index].order = newRequests[newIndex].order;
-      newRequests[newIndex].order = temp;
-      
-      // Swap positions in array
-      [newRequests[index], newRequests[newIndex]] = [newRequests[newIndex], newRequests[index]];
-      onRequestsChange(newRequests);
-    }
   };
 
   const updateRequest = (index: number, updates: Partial<SavedModbusRequest>) => {
@@ -136,7 +164,19 @@ export const ModbusRequestManager = ({
               </div>
 
               <div className="space-y-2">
-                <Label>Count</Label>
+                <div className="flex items-center gap-2">
+                  <Label>Count</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{getCountExplanation(request.function)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <Input
                   type="number"
                   value={request.count}
@@ -154,25 +194,27 @@ export const ModbusRequestManager = ({
                   disabled={disabled}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label>Cycles (empty for infinite)</Label>
+                <Input
+                  type="number"
+                  value={request.cycles || ''}
+                  onChange={(e) => updateRequest(index, { cycles: e.target.value ? parseInt(e.target.value) : undefined })}
+                  disabled={disabled}
+                  min={1}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 p-3 bg-gray-800 rounded-md">
+              <Label>Request Bytes (HEX)</Label>
+              <code className="block mt-2 font-mono text-sm text-green-400">
+                {formatRequestBytes(request)}
+              </code>
             </div>
 
             <div className="flex justify-end gap-2 mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => moveRequest(index, 'up')}
-                disabled={disabled || index === 0}
-              >
-                ↑
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => moveRequest(index, 'down')}
-                disabled={disabled || index === requests.length - 1}
-              >
-                ↓
-              </Button>
               <Button
                 variant="destructive"
                 size="sm"
