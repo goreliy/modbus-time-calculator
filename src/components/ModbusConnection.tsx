@@ -7,6 +7,7 @@ import { ModbusRequestManager } from './ModbusRequestManager';
 import { ModbusHistory } from './ModbusHistory';
 import { useModbusRequests } from '@/hooks/useModbusRequests';
 import { useModbusHistory } from '@/hooks/useModbusHistory';
+import { Loader2 } from 'lucide-react';
 
 interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
@@ -23,6 +24,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     timeout: 1000
   });
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const { requests, handleRequestsChange } = useModbusRequests();
   const { history, addHistoryEntry } = useModbusHistory();
@@ -35,9 +37,11 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   }, []);
 
   const loadSavedSettings = () => {
+    console.log('Loading saved settings...');
     try {
       const savedSettings = loadSettings();
       if (savedSettings) {
+        console.log('Found saved settings:', savedSettings);
         setSettings(savedSettings);
       }
     } catch (error) {
@@ -47,6 +51,8 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   };
 
   const loadPorts = async () => {
+    console.log('Loading available ports...');
+    setIsLoading(true);
     try {
       const availablePorts = await modbusService.getAvailablePorts();
       console.log('Available ports:', availablePorts);
@@ -56,11 +62,15 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       }
     } catch (error) {
       console.error('Error loading ports:', error);
-      toast.error('Failed to load available ports');
+      toast.error('Failed to load available ports. Please check if the backend service is running.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleConnect = async () => {
+    console.log('Attempting connection with settings:', settings);
+    setIsLoading(true);
     try {
       if (isConnected) {
         await modbusService.disconnect();
@@ -78,14 +88,17 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       }
     } catch (error) {
       console.error('Connection error:', error);
-      toast.error('Connection error occurred');
+      toast.error('Connection error occurred. Please check your settings and try again.');
       setIsConnected(false);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSendRequest = async (request: SavedModbusRequest) => {
+    console.log('Sending request:', request);
+    setIsLoading(true);
     try {
-      console.log('Sending request:', request);
       const response = await modbusService.sendRequest(request);
       console.log('Received response:', response);
 
@@ -117,11 +130,19 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         requestName: request.name,
         error: errorMessage
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {isLoading && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 rounded-lg">
+          <Loader2 className="animate-spin h-8 w-8 text-white" />
+        </div>
+      )}
+      
       <ConnectionSettings
         ports={ports}
         settings={settings}
