@@ -189,7 +189,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         <Button
           variant="outline"
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 bg-[#9b87f5] text-white hover:bg-[#7E69AB]"
         >
           <Upload className="h-4 w-4" />
           Import Config
@@ -197,7 +197,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         <Button
           variant="outline"
           onClick={handleExportConfig}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 bg-[#9b87f5] text-white hover:bg-[#7E69AB]"
         >
           <Download className="h-4 w-4" />
           Export Config
