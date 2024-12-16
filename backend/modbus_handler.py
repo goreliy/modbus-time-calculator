@@ -37,13 +37,30 @@ class ModbusHandler:
         self._stop_polling = threading.Event()
 
     def _generate_crc16_table(self):
-        # ... keep existing code (CRC table generation)
+        table = []
+        for i in range(256):
+            crc = 0
+            c = i
+            for j in range(8):
+                if (crc ^ c) & 0x0001:
+                    crc = (crc >> 1) ^ 0xA001
+                else:
+                    crc = crc >> 1
+                c = c >> 1
+            table.append(crc)
+        return table
 
     def _calculate_crc(self, data: bytes) -> int:
-        # ... keep existing code (CRC calculation)
+        crc = 0xFFFF
+        for byte in data:
+            crc = (crc >> 8) ^ self._crc16_table[(crc ^ byte) & 0xFF]
+        return crc
 
     def get_available_ports(self) -> List[str]:
-        # ... keep existing code (port listing)
+        ports = []
+        for port in serial.tools.list_ports.comports():
+            ports.append(port.device)
+        return ports
 
     def connect(self, settings: ModbusSettings) -> bool:
         try:
