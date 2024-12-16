@@ -8,11 +8,11 @@ export const saveToExcel = (settings: SavedModbusSettings, requests: SavedModbus
   const settingsData = [
     ['Setting', 'Value'],
     ['Port', settings.port],
-    ['Baud Rate', settings.baudRate],
+    ['Baud Rate', settings.baudRate.toString()],
     ['Parity', settings.parity],
-    ['Stop Bits', settings.stopBits],
-    ['Data Bits', settings.dataBits],
-    ['Timeout', settings.timeout]
+    ['Stop Bits', settings.stopBits.toString()],
+    ['Data Bits', settings.dataBits.toString()],
+    ['Timeout', settings.timeout.toString()]
   ];
   const settingsSheet = XLSX.utils.aoa_to_sheet(settingsData);
   XLSX.utils.book_append_sheet(workbook, settingsSheet, 'Settings');
@@ -24,12 +24,12 @@ export const saveToExcel = (settings: SavedModbusSettings, requests: SavedModbus
   requests.forEach(req => {
     requestsData.push([
       req.name,
-      req.function,
-      req.startAddress,
-      req.count,
-      req.slaveId,
+      req.function.toString(),
+      req.startAddress.toString(),
+      req.count.toString(),
+      req.slaveId.toString(),
       req.comment || '',
-      req.order
+      req.order.toString()
     ]);
   });
   const requestsSheet = XLSX.utils.aoa_to_sheet(requestsData);
