@@ -199,11 +199,15 @@ class ModbusHandler:
         self._stop_polling.clear()
         cycle_count = 0
         
+        # If cycles is 0 or None, run indefinitely
+        run_indefinitely = cycles is None or cycles == 0
+        
         while not self._stop_polling.is_set():
-            if cycles is not None:
-                if cycle_count >= cycles:
-                    print("Polling completed: reached cycle limit")
-                    break
+            if not run_indefinitely and cycle_count >= cycles:
+                print("Polling completed: reached cycle limit")
+                break
+                
+            if not run_indefinitely:
                 cycle_count += 1
                 print(f"Starting cycle {cycle_count}")
             
@@ -217,12 +221,13 @@ class ModbusHandler:
                 response = self.send_request(request)
                 print(f"Poll response for {request.name}: {response}")
                 
-                if not self._stop_polling.is_set() and interval > 0:
-                    time.sleep(interval)
-            
-            # Add a small delay between cycles to prevent CPU overload
-            if not self._stop_polling.is_set() and interval == 0:
-                time.sleep(0.001)
+                # Add delay between requests
+                if not self._stop_polling.is_set():
+                    if interval > 0:
+                        time.sleep(interval)
+                    else:
+                        # Very small delay to prevent CPU overload
+                        time.sleep(0.001)
 
     def stop_polling(self) -> None:
         print("Stopping polling...")
