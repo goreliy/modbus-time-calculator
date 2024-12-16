@@ -94,7 +94,6 @@ class ModbusHandler:
                         "timestamp": datetime.now().isoformat()
                     }
 
-                # Формируем запрос
                 data = bytearray([request.slave_id, request.function])
                 data.extend(struct.pack('>H', request.start_address))
                 
@@ -106,17 +105,12 @@ class ModbusHandler:
                 else:
                     data.extend(struct.pack('>H', request.count))
                 
-                # Добавляем CRC
                 crc = self._calculate_crc(data)
                 data.extend(struct.pack('<H', crc))
                 
-                # Clear input buffer before sending
                 self.serial.reset_input_buffer()
-                
-                # Отправляем запрос
                 self.serial.write(data)
                 
-                # Читаем ответ с таймаутом
                 response = bytearray()
                 start_time = time.time()
                 
@@ -135,7 +129,6 @@ class ModbusHandler:
                         "timestamp": datetime.now().isoformat()
                     }
                 
-                # Парсим ответ
                 try:
                     parsed_data = self._parse_response(bytes(response), request.function)
                     return {
@@ -163,18 +156,15 @@ class ModbusHandler:
         if len(response) < 5:
             raise ValueError("Response too short")
         
-        # Проверяем CRC
         received_crc = struct.unpack('<H', response[-2:])[0]
         calculated_crc = self._calculate_crc(response[:-2])
         if received_crc != calculated_crc:
             raise ValueError("CRC check failed")
         
-        # Проверяем код ошибки
         if response[1] & 0x80:
             error_code = response[2]
             raise Exception(f"Modbus error: {error_code}")
         
-        # Парсим данные в зависимости от функции
         if function in [1, 2]:  # Read Coils/Discrete Inputs
             byte_count = response[2]
             coil_data = []
@@ -205,26 +195,35 @@ class ModbusHandler:
             raise ValueError(f"Unsupported function: {function}")
 
     def start_polling(self, requests: List[ModbusRequest], interval: float, cycles: Optional[int] = None) -> None:
+        print(f"Starting polling with interval {interval}s and {cycles if cycles is not None else 'infinite'} cycles")
         self._stop_polling.clear()
         cycle_count = 0
         
         while not self._stop_polling.is_set():
             if cycles is not None:
                 if cycle_count >= cycles:
+                    print("Polling completed: reached cycle limit")
                     break
                 cycle_count += 1
+                print(f"Starting cycle {cycle_count}")
             
             sorted_requests = sorted(requests, key=lambda x: x.order)
             
             for request in sorted_requests:
                 if self._stop_polling.is_set():
+                    print("Polling stopped: received stop signal")
                     break
                     
                 response = self.send_request(request)
                 print(f"Poll response for {request.name}: {response}")
                 
-                if not self._stop_polling.is_set():
+                if not self._stop_polling.is_set() and interval > 0:
                     time.sleep(interval)
+            
+            # Add a small delay between cycles to prevent CPU overload
+            if not self._stop_polling.is_set() and interval == 0:
+                time.sleep(0.001)
 
     def stop_polling(self) -> None:
+        print("Stopping polling...")
         self._stop_polling.set()
