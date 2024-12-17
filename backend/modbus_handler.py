@@ -123,6 +123,7 @@ class ModbusHandler:
                     time.sleep(0.001)
                 
                 if not response:
+                    print(f"Timeout for request {request.name}, but continuing...")
                     return {
                         "error": "Timeout: No response received",
                         "request_hex": data.hex(),
@@ -138,6 +139,7 @@ class ModbusHandler:
                         "timestamp": datetime.now().isoformat()
                     }
                 except Exception as e:
+                    print(f"Parse error for request {request.name}: {str(e)}, but continuing...")
                     return {
                         "error": f"Parse error: {str(e)}",
                         "request_hex": data.hex(),
@@ -146,6 +148,7 @@ class ModbusHandler:
                     }
                 
             except Exception as e:
+                print(f"Error in request {request.name}: {str(e)}, but continuing...")
                 return {
                     "error": str(e),
                     "request_hex": data.hex() if 'data' in locals() else None,
@@ -199,7 +202,6 @@ class ModbusHandler:
         self._stop_polling.clear()
         cycle_count = 0
         
-        # If cycles is 0 or None, run indefinitely
         run_indefinitely = cycles is None or cycles == 0
         
         while not self._stop_polling.is_set():
@@ -218,15 +220,17 @@ class ModbusHandler:
                     print("Polling stopped: received stop signal")
                     break
                     
-                response = self.send_request(request)
-                print(f"Poll response for {request.name}: {response}")
+                try:
+                    response = self.send_request(request)
+                    print(f"Poll response for {request.name}: {response}")
+                except Exception as e:
+                    print(f"Error during polling for {request.name}: {str(e)}, continuing with next request")
+                    continue
                 
-                # Add delay between requests
                 if not self._stop_polling.is_set():
                     if interval > 0:
                         time.sleep(interval)
                     else:
-                        # Very small delay to prevent CPU overload
                         time.sleep(0.001)
 
     def stop_polling(self) -> None:
