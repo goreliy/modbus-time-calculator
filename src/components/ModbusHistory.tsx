@@ -9,6 +9,11 @@ interface ModbusHistoryEntry {
   responseHex: string;
   requestName: string;
   error?: string | null;
+  formatted_data?: {
+    decimal: number[];
+    hex: string[];
+    binary: string[];
+  };
 }
 
 interface ModbusHistoryProps {
@@ -19,6 +24,19 @@ export const ModbusHistory = ({ history }: ModbusHistoryProps) => {
   const formatHexString = (hex: string): string => {
     if (!hex) return 'N/A';
     return hex.match(/.{1,2}/g)?.join(' ') || hex;
+  };
+
+  const formatResponseData = (entry: ModbusHistoryEntry) => {
+    if (entry.error) return entry.error;
+    if (!entry.formatted_data) return 'N/A';
+
+    return (
+      <div className="space-y-1 text-sm">
+        <div>Decimal: {entry.formatted_data.decimal.join(', ')}</div>
+        <div>Hex: {entry.formatted_data.hex.join(', ')}</div>
+        <div>Binary: {entry.formatted_data.binary.join(', ')}</div>
+      </div>
+    );
   };
 
   return (
@@ -33,7 +51,7 @@ export const ModbusHistory = ({ history }: ModbusHistoryProps) => {
               <TableHead>Time</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Request (HEX)</TableHead>
-              <TableHead>Response (HEX)</TableHead>
+              <TableHead>Response Data</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -47,12 +65,12 @@ export const ModbusHistory = ({ history }: ModbusHistoryProps) => {
                 <TableCell className="font-mono">
                   {formatHexString(entry.requestHex)}
                 </TableCell>
-                <TableCell className="font-mono">
-                  {formatHexString(entry.responseHex)}
+                <TableCell>
+                  {formatResponseData(entry)}
                 </TableCell>
                 <TableCell>
                   {entry.error ? (
-                    <span className="text-red-500">{entry.error}</span>
+                    <span className="text-red-500">Error</span>
                   ) : (
                     <span className="text-green-500">Success</span>
                   )}

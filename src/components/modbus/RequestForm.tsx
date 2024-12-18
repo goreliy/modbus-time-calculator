@@ -129,6 +129,18 @@ export const RequestForm = ({ request, onUpdate, disabled }: RequestFormProps) =
           min={1}
         />
       </div>
+
+      <div className="space-y-2">
+        <Label>Delay After Request (ms)</Label>
+        <Input
+          type="number"
+          value={request.delay_after ? request.delay_after * 1000 : 100}
+          onChange={(e) => onUpdate({ delay_after: parseInt(e.target.value) / 1000 })}
+          disabled={disabled}
+          min={0}
+          max={10000}
+        />
+      </div>
     </div>
   );
 };
