@@ -12,13 +12,22 @@ interface ModbusRequestManagerProps {
   onRequestsChange: (requests: SavedModbusRequest[]) => void;
   onSendRequest: (request: SavedModbusRequest) => void;
   disabled?: boolean;
+  requestData: Record<string, Array<{
+    timestamp: string;
+    values: {
+      decimal: number[];
+      hex: string[];
+      binary: string[];
+    };
+  }>>;
 }
 
 export const ModbusRequestManager = ({
   requests,
   onRequestsChange,
   onSendRequest,
-  disabled
+  disabled,
+  requestData
 }: ModbusRequestManagerProps) => {
   const addNewRequest = () => {
     const newRequest: SavedModbusRequest = {
@@ -70,9 +79,11 @@ export const ModbusRequestManager = ({
             />
             <RequestPreview request={request} />
             <RequestActions
+              request={request}
               onDelete={() => deleteRequest(index)}
               onSend={() => onSendRequest(request)}
               disabled={disabled}
+              data={requestData[request.id] || []}
             />
           </Card>
         ))}

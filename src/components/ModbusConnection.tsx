@@ -15,7 +15,17 @@ interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
 }
 
+interface RequestData {
+  timestamp: string;
+  values: {
+    decimal: number[];
+    hex: string[];
+    binary: string[];
+  };
+}
+
 export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
+  const [requestData, setRequestData] = useState<Record<string, RequestData[]>>({});
   const [ports, setPorts] = useState<string[]>([]);
   const [settings, setSettings] = useState<SavedModbusSettings>({
     port: '',
@@ -105,22 +115,38 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       const response = await modbusService.sendRequest(request);
       console.log('Received response:', response);
 
-      addHistoryEntry({
-        timestamp: new Date().toISOString(),
-        requestHex: response.requestHex || '',
-        responseHex: response.responseHex || '',
-        requestName: request.name,
-        error: response.error || null
-      });
-
       if (response.error) {
         console.warn('Request error:', response.error);
         toast.error(`Request failed: ${response.error}`);
-      } else if (response.parsedData && onDataReceived) {
-        console.log('Parsed data:', response.parsedData);
-        onDataReceived(response.parsedData);
+      } else if (response.formatted_data) {
+        console.log('Formatted data:', response.formatted_data);
+        
+        // Update request data
+        setRequestData(prev => ({
+          ...prev,
+          [request.id]: [
+            {
+              timestamp: response.timestamp,
+              values: response.formatted_data
+            },
+            ...(prev[request.id] || []).slice(0, 999) // Keep last 1000 entries
+          ]
+        }));
+
+        if (onDataReceived) {
+          onDataReceived(response.parsedData);
+        }
         toast.success('Request completed successfully');
       }
+
+      addHistoryEntry({
+        timestamp: response.timestamp,
+        requestHex: response.requestHex || '',
+        responseHex: response.responseHex || '',
+        requestName: request.name,
+        error: response.error || null,
+        formatted_data: response.formatted_data
+      });
     } catch (error) {
       console.error('Request error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -224,6 +250,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         onRequestsChange={handleRequestsChange}
         onSendRequest={handleSendRequest}
         disabled={!isConnected}
+        requestData={requestData}
       />
 
       <ModbusHistory history={history} />
