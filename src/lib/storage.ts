@@ -1,5 +1,3 @@
-import { ModbusRequest } from './modbusService';
-
 export interface SavedModbusSettings {
   port: string;
   baudRate: number;
