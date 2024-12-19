@@ -31,10 +31,22 @@ export const ModbusHistory = ({ history }: ModbusHistoryProps) => {
     if (!entry.formatted_data) return 'N/A';
 
     return (
-      <div className="space-y-1 text-sm">
-        <div>Decimal: {entry.formatted_data.decimal.join(', ')}</div>
-        <div>Hex: {entry.formatted_data.hex.join(', ')}</div>
-        <div>Binary: {entry.formatted_data.binary.join(', ')}</div>
+      <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-1">
+          {entry.formatted_data.decimal.map((value, idx) => (
+            <div key={idx} className="bg-gray-700/50 p-2 rounded">
+              <div className="text-sm font-mono">
+                <span className="text-blue-400">Dec:</span> {value}
+              </div>
+              <div className="text-sm font-mono">
+                <span className="text-green-400">Hex:</span> {entry.formatted_data?.hex[idx]}
+              </div>
+              <div className="text-sm font-mono">
+                <span className="text-purple-400">Bin:</span> {entry.formatted_data?.binary[idx]}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
@@ -51,7 +63,7 @@ export const ModbusHistory = ({ history }: ModbusHistoryProps) => {
               <TableHead>Time</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Request (HEX)</TableHead>
-              <TableHead>Response Data</TableHead>
+              <TableHead className="w-1/3">Response Data</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
