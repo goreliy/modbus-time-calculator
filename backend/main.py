@@ -26,7 +26,7 @@ class ConnectionSettings(BaseModel):
     parity: str
     stopBits: float
     dataBits: int
-    timeout: int
+    timeout: float
 
 class ModbusRequestModel(BaseModel):
     name: str
@@ -43,7 +43,7 @@ class PollingSettings(BaseModel):
     interval: float
     cycles: Optional[int] = None
 
-@app.get("/ports")  # Изменили путь с /modbus/ports на /ports
+@app.get("/ports")
 async def get_ports():
     try:
         ports = modbus_handler.get_available_ports()
@@ -54,16 +54,18 @@ async def get_ports():
 @app.post("/connect")
 async def connect(settings: ConnectionSettings):
     try:
+        print(f"Received connection settings: {settings}")
         success = modbus_handler.connect(ModbusSettings(
             port=settings.port,
             baudrate=settings.baudRate,
             parity=settings.parity,
             stopbits=settings.stopBits,
             bytesize=settings.dataBits,
-            timeout=settings.timeout / 1000
+            timeout=settings.timeout
         ))
         return {"success": success}
     except Exception as e:
+        print(f"Connection error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/disconnect")

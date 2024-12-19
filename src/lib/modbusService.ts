@@ -36,7 +36,7 @@ class ModbusService {
 
   async getAvailablePorts(): Promise<string[]> {
     console.log('Fetching available ports from:', `${this.baseUrl}/ports`);
-    const response = await fetch(`${this.baseUrl}/ports`);  // Изменили путь с /modbus/ports на /ports
+    const response = await fetch(`${this.baseUrl}/ports`);
     if (!response.ok) {
       console.error('Failed to get ports:', response.status, response.statusText);
       throw new Error('Failed to get available ports');
@@ -47,6 +47,7 @@ class ModbusService {
   }
 
   async connect(settings: SavedModbusSettings): Promise<boolean> {
+    console.log('Connecting with settings:', settings);
     const response = await fetch(`${this.baseUrl}/connect`, {
       method: 'POST',
       headers: {
@@ -54,16 +55,18 @@ class ModbusService {
       },
       body: JSON.stringify({
         port: settings.port,
-        baudrate: settings.baudRate,
+        baudRate: settings.baudRate,
         parity: settings.parity,
-        stopbits: settings.stopBits,
-        bytesize: settings.dataBits,
-        timeout: settings.timeout / 1000,
+        stopBits: settings.stopBits,
+        dataBits: settings.dataBits,
+        timeout: settings.timeout
       }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to connect');
+      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      console.error('Connection failed:', errorData);
+      throw new Error(`Failed to connect: ${errorData.detail}`);
     }
 
     const result = await response.json();
