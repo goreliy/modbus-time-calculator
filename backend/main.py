@@ -43,7 +43,7 @@ class PollingSettings(BaseModel):
     interval: float
     cycles: Optional[int] = None
 
-@app.get("/ports")
+@app.get("/ports")  # Изменили путь с /modbus/ports на /ports
 async def get_ports():
     try:
         ports = modbus_handler.get_available_ports()

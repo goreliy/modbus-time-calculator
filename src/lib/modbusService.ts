@@ -35,15 +35,19 @@ class ModbusService {
   }
 
   async getAvailablePorts(): Promise<string[]> {
-    const response = await fetch(`${this.baseUrl}/modbus/ports`);
+    console.log('Fetching available ports from:', `${this.baseUrl}/ports`);
+    const response = await fetch(`${this.baseUrl}/ports`);  // Изменили путь с /modbus/ports на /ports
     if (!response.ok) {
+      console.error('Failed to get ports:', response.status, response.statusText);
       throw new Error('Failed to get available ports');
     }
-    return response.json();
+    const data = await response.json();
+    console.log('Received ports:', data);
+    return data.ports;
   }
 
   async connect(settings: SavedModbusSettings): Promise<boolean> {
-    const response = await fetch(`${this.baseUrl}/modbus/connect`, {
+    const response = await fetch(`${this.baseUrl}/connect`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -67,7 +71,7 @@ class ModbusService {
   }
 
   async disconnect(): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/modbus/disconnect`, {
+    const response = await fetch(`${this.baseUrl}/disconnect`, {
       method: 'POST',
     });
 
@@ -77,7 +81,7 @@ class ModbusService {
   }
 
   async sendRequest(request: SavedModbusRequest): Promise<ModbusResponse> {
-    const response = await fetch(`${this.baseUrl}/modbus/request`, {
+    const response = await fetch(`${this.baseUrl}/request`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -102,7 +106,7 @@ class ModbusService {
   }
 
   async startPolling(options: PollingOptions): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/modbus/start_polling`, {
+    const response = await fetch(`${this.baseUrl}/start-polling`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -130,7 +134,7 @@ class ModbusService {
   }
 
   async stopPolling(): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/modbus/stop_polling`, {
+    const response = await fetch(`${this.baseUrl}/stop-polling`, {
       method: 'POST',
     });
 
