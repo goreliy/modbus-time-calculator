@@ -6,6 +6,11 @@ export interface HistoryEntry {
   responseHex: string;
   requestName: string;
   error: string | null;
+  formatted_data?: {
+    decimal: number[];
+    hex: string[];
+    binary: string[];
+  };
 }
 
 export const useModbusHistory = () => {
