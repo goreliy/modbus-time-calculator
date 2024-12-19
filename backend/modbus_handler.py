@@ -38,22 +38,58 @@ class ModbusHandler:
         self._stop_polling = threading.Event()
 
     def _generate_crc16_table(self):
-        # ... keep existing code (CRC table generation)
+        table = []
+        for i in range(256):
+            crc = 0
+            c = i
+            for j in range(8):
+                if ((crc ^ c) & 0x0001):
+                    crc = (crc >> 1) ^ 0xA001
+                else:
+                    crc = crc >> 1
+                c = c >> 1
+            table.append(crc)
+        return table
 
     def _calculate_crc(self, data: bytes) -> int:
-        # ... keep existing code (CRC calculation)
+        crc = 0xFFFF
+        for byte in data:
+            crc = (crc >> 8) ^ self._crc16_table[(crc ^ byte) & 0xFF]
+        return crc
 
     def get_available_ports(self) -> List[str]:
-        # ... keep existing code (port listing)
+        if platform.system() == 'Windows':
+            return [port.device for port in serial.tools.list_ports.comports()]
+        else:
+            try:
+                result = subprocess.run(['ls', '/dev/tty*'], capture_output=True, text=True)
+                return [port for port in result.stdout.split('\n') if 'USB' in port or 'ACM' in port]
+            except:
+                return []
 
     def connect(self, settings: ModbusSettings) -> bool:
-        # ... keep existing code (connection handling)
+        try:
+            if self.serial and self.serial.is_open:
+                self.serial.close()
+            
+            self.serial = serial.Serial(
+                port=settings.port,
+                baudrate=settings.baudrate,
+                parity=settings.parity,
+                stopbits=settings.stopbits,
+                bytesize=settings.bytesize,
+                timeout=settings.timeout
+            )
+            return True
+        except Exception as e:
+            print(f"Connection error: {str(e)}")
+            return False
 
     def disconnect(self):
-        # ... keep existing code (disconnection handling)
+        if self.serial and self.serial.is_open:
+            self.serial.close()
 
     def _format_response_data(self, data: List[int]) -> Dict:
-        """Format response data in different representations"""
         result = {
             "decimal": [],
             "hex": [],
@@ -141,7 +177,33 @@ class ModbusHandler:
                 }
 
     def _parse_response(self, response: bytes, function: int) -> Union[List[bool], List[int]]:
-        # ... keep existing code (response parsing)
+        if len(response) < 5:
+            raise ValueError("Response too short")
+            
+        received_crc = struct.unpack('<H', response[-2:])[0]
+        calculated_crc = self._calculate_crc(response[:-2])
+        
+        if received_crc != calculated_crc:
+            raise ValueError("CRC check failed")
+            
+        if function in [1, 2]:  # Read Coils/Discrete Inputs
+            byte_count = response[2]
+            coil_status = []
+            for i in range(byte_count):
+                status_byte = response[3 + i]
+                for bit in range(8):
+                    if (3 + i) * 8 + bit < byte_count * 8:
+                        coil_status.append(bool(status_byte & (1 << bit)))
+            return coil_status
+        elif function in [3, 4]:  # Read Holding/Input Registers
+            byte_count = response[2]
+            register_values = []
+            for i in range(byte_count // 2):
+                register = struct.unpack('>H', response[3 + i * 2:5 + i * 2])[0]
+                register_values.append(register)
+            return register_values
+        else:
+            return []
 
     def start_polling(self, requests: List[ModbusRequest], interval: float, cycles: Optional[int] = None) -> None:
         print(f"Starting polling with interval {interval}s and {cycles if cycles is not None else 'infinite'} cycles")
