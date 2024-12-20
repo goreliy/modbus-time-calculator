@@ -11,6 +11,8 @@ import time
 import csv
 import os
 from pathlib import Path
+from .modbus_utils import generate_crc16_table, calculate_crc
+from .modbus_logger import ModbusLogger
 
 @dataclass
 class ModbusSettings:
@@ -37,42 +39,57 @@ class ModbusHandler:
     def __init__(self):
         self.serial = None
         self._lock = threading.Lock()
-        self._crc16_table = self._generate_crc16_table()
+        self._crc16_table = generate_crc16_table()
         self._stop_polling = threading.Event()
         self._polling_thread = None
         self.logs_dir = Path("logs")
-        self.logs_dir.mkdir(exist_ok=True)
+        self.logger = ModbusLogger(self.logs_dir)
 
-    # ... keep existing code (CRC and port listing methods)
+    def _calculate_crc(self, data: bytes) -> int:
+        return calculate_crc(data, self._crc16_table)
 
-    def _save_exchange_log(self, request: ModbusRequest, response_data: Dict):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = self.logs_dir / f"exchange_log_{timestamp}.csv"
-        
-        with open(filename, 'a', newline='') as f:
-            writer = csv.writer(f)
-            if f.tell() == 0:  # Write header if file is empty
-                writer.writerow(['Timestamp', 'Request Name', 'Request HEX', 'Response HEX', 'Parsed Data'])
+    def get_available_ports(self) -> List[str]:
+        """Get list of available serial ports."""
+        ports = []
+        if platform.system() == "Windows":
+            try:
+                result = subprocess.run(['mode'], capture_output=True, text=True)
+                for line in result.stdout.split('\n'):
+                    if 'COM' in line:
+                        port = line.split(':')[0].strip()
+                        ports.append(port)
+            except Exception as e:
+                print(f"Error getting Windows ports: {e}")
+                
+        # Use serial.tools.list_ports as backup
+        if not ports:
+            ports = [port.device for port in serial.tools.list_ports.comports()]
             
-            writer.writerow([
-                datetime.now().isoformat(),
-                request.name,
-                response_data.get('request_hex', ''),
-                response_data.get('response_hex', ''),
-                str(response_data.get('parsed_data', []))
-            ])
+        return sorted(ports)
 
-    def _save_port_data(self, request: ModbusRequest, parsed_data: List[Union[int, bool]]):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = self.logs_dir / f"port_data_{request.name}_{timestamp}.csv"
-        
-        with open(filename, 'a', newline='') as f:
-            writer = csv.writer(f)
-            if f.tell() == 0:  # Write header if file is empty
-                writer.writerow(['Timestamp', 'Value'])
-            
-            for value in parsed_data:
-                writer.writerow([datetime.now().isoformat(), value])
+    def connect(self, settings: ModbusSettings) -> bool:
+        """Connect to serial port with given settings."""
+        try:
+            if self.serial and self.serial.is_open:
+                self.serial.close()
+
+            self.serial = serial.Serial(
+                port=settings.port,
+                baudrate=settings.baudrate,
+                parity=settings.parity,
+                stopbits=settings.stopbits,
+                bytesize=settings.bytesize,
+                timeout=settings.timeout
+            )
+            return True
+        except Exception as e:
+            print(f"Connection error: {str(e)}")
+            return False
+
+    def disconnect(self) -> None:
+        """Disconnect from serial port."""
+        if self.serial and self.serial.is_open:
+            self.serial.close()
 
     def send_request(self, request: ModbusRequest) -> Dict:
         with self._lock:
@@ -137,8 +154,8 @@ class ModbusHandler:
                     }
                     
                     # Save logs and data
-                    self._save_exchange_log(request, response_data)
-                    self._save_port_data(request, parsed_data)
+                    self.logger.save_exchange_log(request, response_data)
+                    self.logger.save_port_data(request, parsed_data)
                     
                     return response_data
                     
@@ -203,4 +220,10 @@ class ModbusHandler:
         print("Stopping polling...")
         self._stop_polling.set()
 
-    # ... keep existing code (_parse_response and other utility methods)
+    def _parse_response(self, response: bytes, function: int) -> List[Union[int, bool]]:
+        # Implementation of response parsing logic
+        pass
+
+    def _format_response_data(self, parsed_data: List[Union[int, bool]]) -> Dict[str, List[Union[int, bool]]]:
+        # Implementation of response formatting logic
+        pass
