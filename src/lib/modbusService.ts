@@ -2,10 +2,10 @@ import { SavedModbusRequest, SavedModbusSettings } from './storage';
 
 export interface ModbusResponse {
   error?: string;
-  requestHex?: string;
-  responseHex?: string;
+  request_hex?: string;
+  response_hex?: string;
   timestamp: string;
-  parsedData?: Array<number | boolean>;
+  parsed_data?: Array<number | boolean>;
   formatted_data?: {
     decimal: number[];
     hex: string[];
@@ -59,7 +59,7 @@ class ModbusService {
         parity: settings.parity,
         stopBits: settings.stopBits,
         dataBits: settings.dataBits,
-        timeout: settings.timeout
+        timeout: settings.timeout / 1000 // Convert to seconds for backend
       }),
     });
 
