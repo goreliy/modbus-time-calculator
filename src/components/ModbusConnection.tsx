@@ -10,6 +10,7 @@ import { useModbusHistory } from '@/hooks/useModbusHistory';
 import { Loader2, Download, Upload } from 'lucide-react';
 import { Button } from './ui/button';
 import { saveToExcel, loadFromExcel } from '@/lib/excelUtils';
+import { Card } from './ui/card';
 
 interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
@@ -37,6 +38,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   });
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastResponse, setLastResponse] = useState<any>(null);
   
   const { requests, handleRequestsChange } = useModbusRequests();
   const { history, addHistoryEntry } = useModbusHistory();
@@ -75,7 +77,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       }
     } catch (error) {
       console.error('Error loading ports:', error);
-      toast.error('Failed to load available ports. Please check if the backend service is running.');
+      toast.error('Failed to load available ports');
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +103,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       }
     } catch (error) {
       console.error('Connection error:', error);
-      toast.error('Connection error occurred. Please check your settings and try again.');
+      toast.error('Connection error occurred');
       setIsConnected(false);
     } finally {
       setIsLoading(false);
@@ -118,46 +120,48 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       if (response.error) {
         console.warn('Request error:', response.error);
         toast.error(`Request failed: ${response.error}`);
-      } else if (response.formatted_data) {
-        console.log('Formatted data:', response.formatted_data);
+      } else {
+        setLastResponse(response);
         
-        // Update request data
-        setRequestData(prev => ({
-          ...prev,
-          [request.id]: [
-            {
-              timestamp: response.timestamp,
-              values: response.formatted_data
-            },
-            ...(prev[request.id] || []).slice(0, 999) // Keep last 1000 entries
-          ]
-        }));
+        if (response.formatted_data) {
+          console.log('Formatted data:', response.formatted_data);
+          
+          setRequestData(prev => ({
+            ...prev,
+            [request.id]: [
+              {
+                timestamp: response.timestamp,
+                values: response.formatted_data
+              },
+              ...(prev[request.id] || []).slice(0, 999)
+            ]
+          }));
 
-        if (onDataReceived) {
-          onDataReceived(response.parsedData);
+          if (onDataReceived && response.parsed_data) {
+            onDataReceived(response.parsed_data);
+          }
+          toast.success('Request completed successfully');
         }
-        toast.success('Request completed successfully');
       }
 
       addHistoryEntry({
         timestamp: response.timestamp,
-        requestHex: response.requestHex || '',
-        responseHex: response.responseHex || '',
+        requestHex: response.request_hex || '',
+        responseHex: response.response_hex || '',
         requestName: request.name,
         error: response.error || null,
         formatted_data: response.formatted_data
       });
     } catch (error) {
       console.error('Request error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to send request: ${errorMessage}`);
+      toast.error('Failed to send request');
       
       addHistoryEntry({
         timestamp: new Date().toISOString(),
         requestHex: '',
         responseHex: '',
         requestName: request.name,
-        error: errorMessage
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     } finally {
       setIsLoading(false);
@@ -252,6 +256,15 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         disabled={!isConnected}
         requestData={requestData}
       />
+
+      {lastResponse && (
+        <Card className="p-4 bg-gray-800/50">
+          <h3 className="text-lg font-semibold mb-2">Last Response</h3>
+          <pre className="bg-gray-900/50 p-4 rounded overflow-x-auto">
+            {JSON.stringify(lastResponse, null, 2)}
+          </pre>
+        </Card>
+      )}
 
       <ModbusHistory history={history} />
     </div>
