@@ -84,6 +84,7 @@ class ModbusService {
   }
 
   async sendRequest(request: SavedModbusRequest): Promise<ModbusResponse> {
+    console.log('Sending request:', request);
     const response = await fetch(`${this.baseUrl}/request`, {
       method: 'POST',
       headers: {
@@ -92,12 +93,13 @@ class ModbusService {
       body: JSON.stringify({
         name: request.name,
         function: request.function,
-        start_address: request.startAddress,
+        startAddress: request.startAddress,
         count: request.count,
-        slave_id: request.slaveId,
+        slaveId: request.slaveId,
         data: request.data,
         comment: request.comment,
         order: request.order,
+        delay_after: request.delay_after || 0.1,
       }),
     });
 
@@ -109,6 +111,7 @@ class ModbusService {
   }
 
   async startPolling(options: PollingOptions): Promise<void> {
+    console.log('Starting polling with options:', options);
     const response = await fetch(`${this.baseUrl}/start-polling`, {
       method: 'POST',
       headers: {
@@ -118,9 +121,9 @@ class ModbusService {
         requests: options.requests.map(req => ({
           name: req.name,
           function: req.function,
-          start_address: req.startAddress,
+          startAddress: req.startAddress,
           count: req.count,
-          slave_id: req.slaveId,
+          slaveId: req.slaveId,
           data: req.data,
           comment: req.comment,
           order: req.order,
@@ -137,6 +140,7 @@ class ModbusService {
   }
 
   async stopPolling(): Promise<void> {
+    console.log('Stopping polling');
     const response = await fetch(`${this.baseUrl}/stop-polling`, {
       method: 'POST',
     });
