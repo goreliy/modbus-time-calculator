@@ -11,8 +11,8 @@ import time
 import csv
 import os
 from pathlib import Path
-from .modbus_utils import generate_crc16_table, calculate_crc
-from .modbus_logger import ModbusLogger
+from modbus_utils import generate_crc16_table, calculate_crc
+from modbus_logger import ModbusLogger
 
 @dataclass
 class ModbusSettings:

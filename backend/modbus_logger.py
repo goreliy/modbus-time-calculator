@@ -2,14 +2,13 @@ import csv
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Union
-from .modbus_handler import ModbusRequest
 
 class ModbusLogger:
     def __init__(self, logs_dir: Path):
         self.logs_dir = logs_dir
         self.logs_dir.mkdir(exist_ok=True)
 
-    def save_exchange_log(self, request: ModbusRequest, response_data: Dict):
+    def save_exchange_log(self, request, response_data: Dict):
         """Save request/response exchange data to CSV."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = self.logs_dir / f"exchange_log_{timestamp}.csv"
@@ -27,7 +26,7 @@ class ModbusLogger:
                 str(response_data.get('parsed_data', []))
             ])
 
-    def save_port_data(self, request: ModbusRequest, parsed_data: List[Union[int, bool]]):
+    def save_port_data(self, request, parsed_data: List[Union[int, bool]]):
         """Save parsed port data to CSV."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = self.logs_dir / f"port_data_{request.name}_{timestamp}.csv"
