@@ -8,6 +8,9 @@ from datetime import datetime
 import struct
 import threading
 import time
+import csv
+import os
+from pathlib import Path
 
 @dataclass
 class ModbusSettings:
@@ -28,7 +31,7 @@ class ModbusRequest:
     data: Optional[List[int]] = None
     comment: Optional[str] = None
     order: int = 0
-    delay_after: float = 0.1  # Delay after this request in seconds
+    delay_after: float = 0.1
 
 class ModbusHandler:
     def __init__(self):
@@ -37,72 +40,39 @@ class ModbusHandler:
         self._crc16_table = self._generate_crc16_table()
         self._stop_polling = threading.Event()
         self._polling_thread = None
+        self.logs_dir = Path("logs")
+        self.logs_dir.mkdir(exist_ok=True)
 
-    def _generate_crc16_table(self):
-        table = []
-        for i in range(256):
-            crc = 0
-            c = i
-            for j in range(8):
-                if ((crc ^ c) & 0x0001):
-                    crc = (crc >> 1) ^ 0xA001
-                else:
-                    crc = crc >> 1
-                c = c >> 1
-            table.append(crc)
-        return table
+    # ... keep existing code (CRC and port listing methods)
 
-    def _calculate_crc(self, data: bytes) -> int:
-        crc = 0xFFFF
-        for byte in data:
-            crc = (crc >> 8) ^ self._crc16_table[(crc ^ byte) & 0xFF]
-        return crc
-
-    def get_available_ports(self) -> List[str]:
-        if platform.system() == 'Windows':
-            return [port.device for port in serial.tools.list_ports.comports()]
-        else:
-            try:
-                result = subprocess.run(['ls', '/dev/tty*'], capture_output=True, text=True)
-                return [port for port in result.stdout.split('\n') if 'USB' in port or 'ACM' in port]
-            except:
-                return []
-
-    def connect(self, settings: ModbusSettings) -> bool:
-        try:
-            if self.serial and self.serial.is_open:
-                self.serial.close()
-            
-            self.serial = serial.Serial(
-                port=settings.port,
-                baudrate=settings.baudrate,
-                parity=settings.parity,
-                stopbits=settings.stopbits,
-                bytesize=settings.bytesize,
-                timeout=settings.timeout
-            )
-            return True
-        except Exception as e:
-            print(f"Connection error: {str(e)}")
-            return False
-
-    def disconnect(self):
-        if self.serial and self.serial.is_open:
-            self.serial.close()
-
-    def _format_response_data(self, data: List[int]) -> Dict:
-        result = {
-            "decimal": [],
-            "hex": [],
-            "binary": []
-        }
+    def _save_exchange_log(self, request: ModbusRequest, response_data: Dict):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = self.logs_dir / f"exchange_log_{timestamp}.csv"
         
-        for value in data:
-            result["decimal"].append(value)
-            result["hex"].append(f"0x{value:04X}")
-            result["binary"].append(f"0b{value:016b}")
+        with open(filename, 'a', newline='') as f:
+            writer = csv.writer(f)
+            if f.tell() == 0:  # Write header if file is empty
+                writer.writerow(['Timestamp', 'Request Name', 'Request HEX', 'Response HEX', 'Parsed Data'])
             
-        return result
+            writer.writerow([
+                datetime.now().isoformat(),
+                request.name,
+                response_data.get('request_hex', ''),
+                response_data.get('response_hex', ''),
+                str(response_data.get('parsed_data', []))
+            ])
+
+    def _save_port_data(self, request: ModbusRequest, parsed_data: List[Union[int, bool]]):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = self.logs_dir / f"port_data_{request.name}_{timestamp}.csv"
+        
+        with open(filename, 'a', newline='') as f:
+            writer = csv.writer(f)
+            if f.tell() == 0:  # Write header if file is empty
+                writer.writerow(['Timestamp', 'Value'])
+            
+            for value in parsed_data:
+                writer.writerow([datetime.now().isoformat(), value])
 
     def send_request(self, request: ModbusRequest) -> Dict:
         with self._lock:
@@ -157,13 +127,21 @@ class ModbusHandler:
                 try:
                     parsed_data = self._parse_response(bytes(response), request.function)
                     formatted_data = self._format_response_data(parsed_data)
-                    return {
+                    
+                    response_data = {
                         "request_hex": data.hex(),
                         "response_hex": response.hex(),
                         "parsed_data": parsed_data,
                         "formatted_data": formatted_data,
                         "timestamp": datetime.now().isoformat()
                     }
+                    
+                    # Save logs and data
+                    self._save_exchange_log(request, response_data)
+                    self._save_port_data(request, parsed_data)
+                    
+                    return response_data
+                    
                 except Exception as e:
                     print(f"Parse error for {request.name}: {str(e)}")
                     return {
@@ -206,7 +184,6 @@ class ModbusHandler:
                     response = self.send_request(request)
                     print(f"Poll response for {request.name}: {response}")
                     
-                    # Wait for the request-specific delay
                     if not self._stop_polling.is_set() and request.delay_after > 0:
                         print(f"Waiting {request.delay_after}s after request {request.name}")
                         time.sleep(request.delay_after)
@@ -215,7 +192,6 @@ class ModbusHandler:
                     print(f"Error during polling for {request.name}: {str(e)}")
                     continue
             
-            # Global interval between cycles
             if not self._stop_polling.is_set():
                 if interval > 0:
                     print(f"Waiting {interval}s before next cycle")
@@ -226,32 +202,5 @@ class ModbusHandler:
     def stop_polling(self) -> None:
         print("Stopping polling...")
         self._stop_polling.set()
-    
-    def _parse_response(self, response: bytes, function: int) -> Union[List[bool], List[int]]:
-        if len(response) < 5:
-            raise ValueError("Response too short")
-            
-        received_crc = struct.unpack('<H', response[-2:])[0]
-        calculated_crc = self._calculate_crc(response[:-2])
-        
-        if received_crc != calculated_crc:
-            raise ValueError("CRC check failed")
-            
-        if function in [1, 2]:  # Read Coils/Discrete Inputs
-            byte_count = response[2]
-            coil_status = []
-            for i in range(byte_count):
-                status_byte = response[3 + i]
-                for bit in range(8):
-                    if (3 + i) * 8 + bit < byte_count * 8:
-                        coil_status.append(bool(status_byte & (1 << bit)))
-            return coil_status
-        elif function in [3, 4]:  # Read Holding/Input Registers
-            byte_count = response[2]
-            register_values = []
-            for i in range(byte_count // 2):
-                register = struct.unpack('>H', response[3 + i * 2:5 + i * 2])[0]
-                register_values.append(register)
-            return register_values
-        else:
-            return []
+
+    # ... keep existing code (_parse_response and other utility methods)

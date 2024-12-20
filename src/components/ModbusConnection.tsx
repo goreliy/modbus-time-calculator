@@ -11,6 +11,7 @@ import { Loader2, Download, Upload } from 'lucide-react';
 import { Button } from './ui/button';
 import { saveToExcel, loadFromExcel } from '@/lib/excelUtils';
 import { Card } from './ui/card';
+import { LineChart } from './ModbusDataVisualizer';
 
 interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
@@ -27,6 +28,7 @@ interface RequestData {
 
 export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   const [requestData, setRequestData] = useState<Record<string, RequestData[]>>({});
+  const [chartData, setChartData] = useState<Array<{ timestamp: number; value: number }>>([]);
   const [ports, setPorts] = useState<string[]>([]);
   const [settings, setSettings] = useState<SavedModbusSettings>({
     port: '',
@@ -137,9 +139,21 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
             ]
           }));
 
-          if (onDataReceived && response.parsed_data) {
-            onDataReceived(response.parsed_data);
+          // Update chart data
+          if (response.parsed_data) {
+            setChartData(prev => [
+              {
+                timestamp: new Date(response.timestamp).getTime(),
+                value: response.parsed_data[0] as number
+              },
+              ...prev.slice(0, 99)
+            ]);
+            
+            if (onDataReceived) {
+              onDataReceived(response.parsed_data);
+            }
           }
+          
           toast.success('Request completed successfully');
         }
       }
@@ -256,6 +270,13 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         disabled={!isConnected}
         requestData={requestData}
       />
+
+      {chartData.length > 0 && (
+        <Card className="p-4 bg-gray-800/50">
+          <h3 className="text-lg font-semibold mb-2">Real-time Data</h3>
+          <LineChart data={chartData} title="Modbus Values" />
+        </Card>
+      )}
 
       {lastResponse && (
         <Card className="p-4 bg-gray-800/50">
