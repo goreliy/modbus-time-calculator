@@ -60,6 +60,18 @@ class ModbusHandler:
         self.request_queue = []
         self.current_request_stats = {}
 
+    def get_available_ports(self) -> List[str]:
+        """Get a list of available serial ports."""
+        try:
+            ports = []
+            for port in serial.tools.list_ports.comports():
+                ports.append(port.device)
+            print(f"Found available ports: {ports}")  # Debug log
+            return ports
+        except Exception as e:
+            print(f"Error getting available ports: {str(e)}")  # Debug log
+            raise Exception(f"Failed to get available ports: {str(e)}")
+
     def connect(self, settings: ModbusSettings) -> bool:
         try:
             if settings.connection_type == 'tcp':

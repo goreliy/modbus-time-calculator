@@ -19,39 +19,15 @@ app.add_middleware(
 modbus_handler = ModbusHandler()
 polling_thread = None
 
-class ConnectionSettings(BaseModel):
-    connectionType: str = 'serial'
-    port: Optional[str] = None
-    baudRate: Optional[int] = None
-    parity: Optional[str] = None
-    stopBits: Optional[float] = None
-    dataBits: Optional[int] = None
-    timeout: float
-    ipAddress: Optional[str] = None
-    tcpPort: Optional[int] = None
-
-class ModbusRequestModel(BaseModel):
-    name: str
-    function: int
-    startAddress: int
-    count: int
-    slaveId: Optional[int] = 1
-    data: Optional[List[int]] = None
-    comment: Optional[str] = None
-    order: Optional[int] = 0
-    cycles: Optional[int] = None
-
-class PollingSettings(BaseModel):
-    requests: List[ModbusRequestModel]
-    interval: float
-    cycles: Optional[int] = None
-
 @app.get("/ports")
 async def get_ports():
     try:
+        print("Getting available ports...")  # Debug log
         ports = modbus_handler.get_available_ports()
+        print(f"Retrieved ports: {ports}")  # Debug log
         return {"ports": ports}
     except Exception as e:
+        print(f"Error in get_ports endpoint: {str(e)}")  # Debug log
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/connect")
