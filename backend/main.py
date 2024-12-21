@@ -19,6 +19,33 @@ app.add_middleware(
 modbus_handler = ModbusHandler()
 polling_thread = None
 
+class ConnectionSettings(BaseModel):
+    connectionType: str = 'serial'
+    port: Optional[str] = None
+    baudRate: Optional[int] = None
+    parity: Optional[str] = None
+    stopBits: Optional[float] = None
+    dataBits: Optional[int] = None
+    timeout: float
+    ipAddress: Optional[str] = None
+    tcpPort: Optional[int] = None
+
+class ModbusRequestModel(BaseModel):
+    name: str
+    function: int
+    startAddress: int
+    count: int
+    slaveId: Optional[int] = 1
+    data: Optional[List[int]] = None
+    comment: Optional[str] = None
+    order: Optional[int] = 0
+    cycles: Optional[int] = None
+
+class PollingSettings(BaseModel):
+    requests: List[ModbusRequestModel]
+    interval: float
+    cycles: Optional[int] = None
+
 @app.get("/ports")
 async def get_ports():
     try:
