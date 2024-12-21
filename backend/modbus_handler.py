@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from modbus_utils import generate_crc16_table, calculate_crc
 from modbus_logger import ModbusLogger
+from request_queue import RequestQueue, ModbusRequest, RequestStats
 import socket
 
 @dataclass
@@ -25,51 +26,26 @@ class ModbusSettings:
     ip_address: Optional[str] = None
     tcp_port: Optional[int] = None
 
-@dataclass
-class RequestStats:
-    total: int = 0
-    completed: int = 0
-    timeouts: int = 0
-    errors: int = 0
-    remaining: int = 0
-
-@dataclass
-class ModbusRequest:
-    name: str
-    function: int
-    start_address: int
-    count: int = 1
-    slave_id: int = 1
-    data: Optional[List[int]] = None
-    comment: Optional[str] = None
-    order: int = 0
-    delay_after: float = 0.1
-    cycles: Optional[int] = None
-    stats: RequestStats = RequestStats()
-
 class ModbusHandler:
     def __init__(self):
         self.serial = None
         self.tcp_socket = None
         self._lock = threading.Lock()
         self._crc16_table = generate_crc16_table()
-        self._stop_polling = threading.Event()
         self._polling_thread = None
         self.logs_dir = Path("logs")
         self.logger = ModbusLogger(self.logs_dir)
-        self.request_queue = []
-        self.current_request_stats = {}
+        self.request_queue = RequestQueue()
 
     def get_available_ports(self) -> List[str]:
-        """Get a list of available serial ports."""
         try:
             ports = []
             for port in serial.tools.list_ports.comports():
                 ports.append(port.device)
-            print(f"Found available ports: {ports}")  # Debug log
+            print(f"Found available ports: {ports}")
             return ports
         except Exception as e:
-            print(f"Error getting available ports: {str(e)}")  # Debug log
+            print(f"Error getting available ports: {str(e)}")
             raise Exception(f"Failed to get available ports: {str(e)}")
 
     def connect(self, settings: ModbusSettings) -> bool:
@@ -118,16 +94,25 @@ class ModbusHandler:
                 
                 if not response:
                     request.stats.timeouts += 1
+                    request.stats.remaining = self.request_queue.get_remaining_count(request.name)
                     return {
                         "error": "Timeout: No response received",
                         "request_hex": data.hex(),
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
+                        "stats": {
+                            "total": request.stats.total,
+                            "completed": request.stats.completed,
+                            "timeouts": request.stats.timeouts,
+                            "errors": request.stats.errors,
+                            "remaining": request.stats.remaining
+                        }
                     }
 
                 try:
                     parsed_data = self._parse_response(bytes(response), request.function)
                     formatted_data = self._format_response_data(parsed_data)
                     request.stats.completed += 1
+                    request.stats.remaining = self.request_queue.get_remaining_count(request.name)
                     
                     response_data = {
                         "request_hex": data.hex(),
@@ -151,6 +136,7 @@ class ModbusHandler:
                     
                 except Exception as e:
                     request.stats.errors += 1
+                    request.stats.remaining = self.request_queue.get_remaining_count(request.name)
                     return {
                         "error": f"Parse error: {str(e)}",
                         "request_hex": data.hex(),
@@ -167,6 +153,7 @@ class ModbusHandler:
                 
             except Exception as e:
                 request.stats.errors += 1
+                request.stats.remaining = self.request_queue.get_remaining_count(request.name)
                 return {
                     "error": str(e),
                     "timestamp": datetime.now().isoformat(),
@@ -180,84 +167,40 @@ class ModbusHandler:
                 }
 
     def _prepare_request(self, request: ModbusRequest) -> bytearray:
-        data = bytearray([request.slave_id, request.function])
-        data.extend(struct.pack('>H', request.start_address))
-        
-        if request.function in [5, 6]:
-            value = request.data[0] if request.data else 0
-            if request.function == 5:
-                value = 0xFF00 if value else 0x0000
-            data.extend(struct.pack('>H', value))
-        else:
-            data.extend(struct.pack('>H', request.count))
-        
-        if self.tcp_socket:
-            # Add Modbus TCP header
-            transaction_id = 1  # Can be incremented for each request
-            protocol_id = 0
-            length = len(data)
-            header = struct.pack('>HHH', transaction_id, protocol_id, length)
-            data = header + data
-        else:
-            # Add CRC for RTU mode
-            crc = calculate_crc(data, self._crc16_table)
-            data.extend(struct.pack('<H', crc))
-        
-        return data
+        # ... keep existing code (request preparation logic)
 
     def _send_and_receive(self, data: bytearray) -> Optional[bytearray]:
-        if self.tcp_socket:
-            self.tcp_socket.send(data)
-            response = bytearray()
-            while len(response) < 260:  # Maximum Modbus response size
-                chunk = self.tcp_socket.recv(260 - len(response))
-                if not chunk:
-                    break
-                response.extend(chunk)
-            return response
-        else:
-            self.serial.reset_input_buffer()
-            self.serial.write(data)
-            response = bytearray()
-            start_time = time.time()
-            
-            while (time.time() - start_time) < self.serial.timeout:
-                if self.serial.in_waiting:
-                    new_data = self.serial.read(self.serial.in_waiting)
-                    response.extend(new_data)
-                    if len(response) >= 5:
-                        break
-                time.sleep(0.001)
-            
-            return response if response else None
+        # ... keep existing code (send and receive logic)
 
     def start_polling(self, requests: List[ModbusRequest], interval: float, cycles: Optional[int] = None) -> None:
         print(f"Starting polling with interval {interval}s and {cycles if cycles is not None else 'infinite'} cycles")
-        self._stop_polling.clear()
+        self.request_queue = RequestQueue()
         
-        # Initialize request queue and statistics
-        self.request_queue = []
+        # Initialize request queue
         for request in requests:
-            request.stats = RequestStats()
-            request.stats.total = request.cycles if request.cycles is not None else (cycles if cycles is not None else 0)
-            request.stats.remaining = request.stats.total
-            self.request_queue.extend([request] * (request.cycles if request.cycles is not None else (cycles if cycles is not None else 1)))
+            self.request_queue.add_request(request, cycles)
         
         self._polling_thread = threading.Thread(target=self._polling_worker, args=(interval,))
         self._polling_thread.start()
 
     def _polling_worker(self, interval: float) -> None:
-        while not self._stop_polling.is_set() and self.request_queue:
-            request = self.request_queue.pop(0)
+        while not self.request_queue.should_stop():
+            request = self.request_queue.get_next_request()
+            if not request:
+                if interval > 0:
+                    time.sleep(interval)
+                continue
             
             try:
                 print(f"Executing request {request.name}")
                 response = self.send_request(request)
                 print(f"Poll response for {request.name}: {response}")
                 
-                request.stats.remaining = len([r for r in self.request_queue if r.name == request.name])
+                # For infinite polling, add the request back to the queue
+                if request.stats.total == 0:
+                    self.request_queue.add_request(request)
                 
-                if not self._stop_polling.is_set() and request.delay_after > 0:
+                if not self.request_queue.should_stop() and request.delay_after > 0:
                     time.sleep(request.delay_after)
                     
             except Exception as e:
@@ -265,20 +208,18 @@ class ModbusHandler:
                 request.stats.errors += 1
                 continue
             
-            if not self._stop_polling.is_set() and interval > 0:
+            if not self.request_queue.should_stop() and interval > 0:
                 time.sleep(interval)
 
     def stop_polling(self) -> None:
         print("Stopping polling...")
-        self._stop_polling.set()
+        self.request_queue.stop()
         if self._polling_thread and self._polling_thread.is_alive():
             self._polling_thread.join()
         self.request_queue.clear()
 
     def _parse_response(self, response: bytes, function: int) -> List[Union[int, bool]]:
-        # Implementation of response parsing logic
-        pass
+        # ... keep existing code (response parsing logic)
 
     def _format_response_data(self, parsed_data: List[Union[int, bool]]) -> Dict[str, List[Union[int, bool]]]:
-        # Implementation of response formatting logic
-        pass
+        # ... keep existing code (response formatting logic)
