@@ -5,6 +5,9 @@ export interface SavedModbusSettings {
   stopBits: number;
   dataBits: number;
   timeout: number;
+  connectionType?: 'serial' | 'tcp';
+  ipAddress?: string;
+  tcpPort?: number;
 }
 
 export interface SavedModbusRequest {

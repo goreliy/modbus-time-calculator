@@ -8,7 +8,6 @@ import threading
 
 app = FastAPI()
 
-# Настройка CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,12 +20,15 @@ modbus_handler = ModbusHandler()
 polling_thread = None
 
 class ConnectionSettings(BaseModel):
-    port: str
-    baudRate: int
-    parity: str
-    stopBits: float
-    dataBits: int
+    connectionType: str = 'serial'
+    port: Optional[str] = None
+    baudRate: Optional[int] = None
+    parity: Optional[str] = None
+    stopBits: Optional[float] = None
+    dataBits: Optional[int] = None
     timeout: float
+    ipAddress: Optional[str] = None
+    tcpPort: Optional[int] = None
 
 class ModbusRequestModel(BaseModel):
     name: str
@@ -37,6 +39,7 @@ class ModbusRequestModel(BaseModel):
     data: Optional[List[int]] = None
     comment: Optional[str] = None
     order: Optional[int] = 0
+    cycles: Optional[int] = None
 
 class PollingSettings(BaseModel):
     requests: List[ModbusRequestModel]
@@ -55,14 +58,18 @@ async def get_ports():
 async def connect(settings: ConnectionSettings):
     try:
         print(f"Received connection settings: {settings}")
-        success = modbus_handler.connect(ModbusSettings(
+        modbus_settings = ModbusSettings(
             port=settings.port,
             baudrate=settings.baudRate,
             parity=settings.parity,
             stopbits=settings.stopBits,
             bytesize=settings.dataBits,
-            timeout=settings.timeout
-        ))
+            timeout=settings.timeout,
+            connection_type=settings.connectionType,
+            ip_address=settings.ipAddress,
+            tcp_port=settings.tcpPort
+        )
+        success = modbus_handler.connect(modbus_settings)
         return {"success": success}
     except Exception as e:
         print(f"Connection error: {str(e)}")
@@ -87,7 +94,8 @@ async def send_request(request: ModbusRequestModel):
             slave_id=request.slaveId,
             data=request.data,
             comment=request.comment,
-            order=request.order
+            order=request.order,
+            cycles=request.cycles
         )
         response = modbus_handler.send_request(modbus_request)
         return response
@@ -111,7 +119,8 @@ async def start_polling(settings: PollingSettings):
                 slave_id=req.slaveId,
                 data=req.data,
                 comment=req.comment,
-                order=req.order
+                order=req.order,
+                cycles=req.cycles
             ) for req in settings.requests
         ]
 
