@@ -167,10 +167,63 @@ class ModbusHandler:
                 }
 
     def _prepare_request(self, request: ModbusRequest) -> bytearray:
-        # ... keep existing code (request preparation logic)
+        data = bytearray([request.slave_id, request.function])
+        
+        # Add address (2 bytes)
+        data.extend([(request.start_address >> 8) & 0xFF, request.start_address & 0xFF])
+        
+        if request.function in [1, 2, 3, 4]:  # Read functions
+            # Add quantity (2 bytes)
+            data.extend([(request.count >> 8) & 0xFF, request.count & 0xFF])
+        elif request.function in [5, 6]:  # Single write functions
+            # Add single value (2 bytes)
+            value = request.data[0] if request.data else 0
+            data.extend([(value >> 8) & 0xFF, value & 0xFF])
+        elif request.function in [15, 16]:  # Multiple write functions
+            # Add quantity (2 bytes)
+            data.extend([(request.count >> 8) & 0xFF, request.count & 0xFF])
+            
+            if request.function == 15:  # Write multiple coils
+                byte_count = (request.count + 7) // 8
+                data.append(byte_count)
+                
+                values = 0
+                for i, value in enumerate(request.data or []):
+                    if value:
+                        values |= (1 << (i % 8))
+                    if (i + 1) % 8 == 0 or i == len(request.data or []) - 1:
+                        data.append(values)
+                        values = 0
+            else:  # Write multiple registers
+                byte_count = request.count * 2
+                data.append(byte_count)
+                
+                for value in request.data or []:
+                    data.extend([(value >> 8) & 0xFF, value & 0xFF])
+        
+        # Calculate and append CRC
+        crc = calculate_crc(data, self._crc16_table)
+        data.extend([crc & 0xFF, (crc >> 8) & 0xFF])
+        
+        return data
 
     def _send_and_receive(self, data: bytearray) -> Optional[bytearray]:
-        # ... keep existing code (send and receive logic)
+        try:
+            if self.tcp_socket:
+                self.tcp_socket.send(data)
+                response = self.tcp_socket.recv(1024)
+            else:
+                self.serial.write(data)
+                response = self.serial.read(256)  # Adjust size as needed
+            
+            if not response:
+                return None
+                
+            return bytearray(response)
+            
+        except Exception as e:
+            print(f"Communication error: {str(e)}")
+            return None
 
     def start_polling(self, requests: List[ModbusRequest], interval: float, cycles: Optional[int] = None) -> None:
         print(f"Starting polling with interval {interval}s and {cycles if cycles is not None else 'infinite'} cycles")
@@ -219,7 +272,54 @@ class ModbusHandler:
         self.request_queue.clear()
 
     def _parse_response(self, response: bytes, function: int) -> List[Union[int, bool]]:
-        # ... keep existing code (response parsing logic)
+        if len(response) < 3:
+            raise Exception("Response too short")
+            
+        # Skip slave ID and function code
+        data = response[2:]
+        
+        if function in [1, 2]:  # Read coils or discrete inputs
+            byte_count = data[0]
+            coil_data = []
+            
+            for byte_val in data[1:byte_count+1]:
+                for bit in range(8):
+                    coil_data.append(bool(byte_val & (1 << bit)))
+                    
+            return coil_data
+            
+        elif function in [3, 4]:  # Read holding or input registers
+            byte_count = data[0]
+            register_data = []
+            
+            for i in range(1, byte_count, 2):
+                if i + 1 < len(data):
+                    register_data.append((data[i] << 8) | data[i + 1])
+                    
+            return register_data
+            
+        elif function in [5, 6, 15, 16]:  # Write functions
+            # For write functions, return the written values
+            return [(data[0] << 8) | data[1]]
+            
+        else:
+            raise Exception(f"Unsupported function code: {function}")
 
     def _format_response_data(self, parsed_data: List[Union[int, bool]]) -> Dict[str, List[Union[int, bool]]]:
-        # ... keep existing code (response formatting logic)
+        formatted = {
+            "decimal": [],
+            "hex": [],
+            "binary": []
+        }
+        
+        for value in parsed_data:
+            if isinstance(value, bool):
+                formatted["decimal"].append(1 if value else 0)
+                formatted["hex"].append("0x01" if value else "0x00")
+                formatted["binary"].append("0b1" if value else "0b0")
+            else:
+                formatted["decimal"].append(value)
+                formatted["hex"].append(f"0x{value:04X}")
+                formatted["binary"].append(f"0b{value:016b}")
+                
+        return formatted
