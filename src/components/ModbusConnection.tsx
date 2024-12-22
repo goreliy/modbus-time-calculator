@@ -12,18 +12,10 @@ import { Button } from './ui/button';
 import { saveToExcel, loadFromExcel } from '@/lib/excelUtils';
 import { Card } from './ui/card';
 import { LineChart } from './ModbusDataVisualizer';
+import { GlobalQueueStatistics } from './modbus/GlobalQueueStatistics';
 
 interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
-}
-
-interface RequestData {
-  timestamp: string;
-  values: {
-    decimal: number[];
-    hex: string[];
-    binary: string[];
-  };
 }
 
 export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
@@ -47,6 +39,16 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
 
   const modbusService = ModbusService.getInstance();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isPolling, setIsPolling] = useState(false);
+  const [globalStats, setGlobalStats] = useState({
+    totalRequests: 0,
+    completedRequests: 0,
+    timeoutRequests: 0,
+    errorRequests: 0,
+    remainingRequests: 0,
+    isPolling: false
+  });
 
   useEffect(() => {
     loadPorts();
@@ -221,6 +223,49 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     }
   };
 
+  const handleStartPolling = async () => {
+    console.log('Starting global polling...');
+    try {
+      await modbusService.startPolling({
+        requests,
+        interval: 1000,
+        cycles: undefined
+      });
+      setIsPolling(true);
+      setGlobalStats(prev => ({ ...prev, isPolling: true }));
+      toast.success('Polling started');
+    } catch (error) {
+      console.error('Polling error:', error);
+      toast.error('Failed to start polling');
+    }
+  };
+
+  const handleStopPolling = async () => {
+    console.log('Stopping global polling...');
+    try {
+      await modbusService.stopPolling();
+      setIsPolling(false);
+      setGlobalStats(prev => ({ ...prev, isPolling: false }));
+      toast.success('Polling stopped');
+    } catch (error) {
+      console.error('Stop polling error:', error);
+      toast.error('Failed to stop polling');
+    }
+  };
+
+  useEffect(() => {
+    if (lastResponse?.stats) {
+      setGlobalStats(prev => ({
+        ...prev,
+        totalRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.total || 0), 0),
+        completedRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.completed || 0), 0),
+        timeoutRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.timeouts || 0), 0),
+        errorRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.errors || 0), 0),
+        remainingRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.remaining || 0), 0)
+      }));
+    }
+  }, [lastResponse?.stats, requests]);
+
   return (
     <div className="space-y-6 relative">
       {isLoading && (
@@ -255,20 +300,29 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         />
       </div>
 
-      <ConnectionSettings
-        ports={ports}
-        settings={settings}
-        isConnected={isConnected}
-        onSettingsChange={setSettings}
-        onConnect={handleConnect}
-      />
+      <div className="grid grid-cols-2 gap-6">
+        <ConnectionSettings
+          ports={ports}
+          settings={settings}
+          isConnected={isConnected}
+          onSettingsChange={setSettings}
+          onConnect={handleConnect}
+        />
+        <GlobalQueueStatistics
+          stats={globalStats}
+          onStartPolling={handleStartPolling}
+          onStopPolling={handleStopPolling}
+          disabled={!isConnected}
+        />
+      </div>
 
       <ModbusRequestManager
         requests={requests}
         onRequestsChange={handleRequestsChange}
         onSendRequest={handleSendRequest}
-        disabled={!isConnected}
+        disabled={!isConnected || isPolling}
         requestData={requestData}
+        requestStats={lastResponse?.stats}
       />
 
       {chartData.length > 0 && (
