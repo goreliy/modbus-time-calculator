@@ -20,6 +20,13 @@ interface ModbusRequestManagerProps {
       binary: string[];
     };
   }>>;
+  requestStats?: Record<string, {
+    total: number;
+    completed: number;
+    timeouts: number;
+    errors: number;
+    remaining: number;
+  }>;
 }
 
 export const ModbusRequestManager = ({
@@ -27,7 +34,8 @@ export const ModbusRequestManager = ({
   onRequestsChange,
   onSendRequest,
   disabled,
-  requestData
+  requestData,
+  requestStats
 }: ModbusRequestManagerProps) => {
   const addNewRequest = () => {
     const newRequest: SavedModbusRequest = {
@@ -84,6 +92,7 @@ export const ModbusRequestManager = ({
               onSend={() => onSendRequest(request)}
               disabled={disabled}
               data={requestData[request.id] || []}
+              stats={requestStats?.[request.id]}
             />
           </Card>
         ))}
