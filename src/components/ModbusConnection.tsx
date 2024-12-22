@@ -18,6 +18,15 @@ interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
 }
 
+interface RequestData {
+  timestamp: string;
+  values: {
+    decimal: number[];
+    hex: string[];
+    binary: string[];
+  };
+}
+
 export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   const [requestData, setRequestData] = useState<Record<string, RequestData[]>>({});
   const [chartData, setChartData] = useState<Array<{ timestamp: number; value: number }>>([]);
@@ -33,6 +42,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [lastResponse, setLastResponse] = useState<any>(null);
+  const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   
   const { requests, handleRequestsChange } = useModbusRequests();
   const { history, addHistoryEntry } = useModbusHistory();
@@ -225,18 +235,26 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
 
   const handleStartPolling = async () => {
     console.log('Starting global polling...');
+    if (selectedRequests.length === 0) {
+      toast.error('Выберите хотя бы один запрос для очереди');
+      return;
+    }
+
     try {
+      const selectedRequestObjects = requests.filter(req => selectedRequests.includes(req.id));
+      console.log('Selected requests for polling:', selectedRequestObjects);
+
       await modbusService.startPolling({
-        requests,
-        interval: 1000,
+        requests: selectedRequestObjects,
+        interval: 1.0, // 1 second interval
         cycles: undefined
       });
       setIsPolling(true);
       setGlobalStats(prev => ({ ...prev, isPolling: true }));
-      toast.success('Polling started');
+      toast.success('Опрос запущен');
     } catch (error) {
       console.error('Polling error:', error);
-      toast.error('Failed to start polling');
+      toast.error('Не удалось запустить опрос');
     }
   };
 
@@ -246,11 +264,21 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
       await modbusService.stopPolling();
       setIsPolling(false);
       setGlobalStats(prev => ({ ...prev, isPolling: false }));
-      toast.success('Polling stopped');
+      toast.success('Опрос остановлен');
     } catch (error) {
       console.error('Stop polling error:', error);
-      toast.error('Failed to stop polling');
+      toast.error('Не удалось остановить опрос');
     }
+  };
+
+  const handleRequestSelectionChange = (requestId: string, selected: boolean) => {
+    setSelectedRequests(prev => {
+      if (selected) {
+        return [...prev, requestId];
+      } else {
+        return prev.filter(id => id !== requestId);
+      }
+    });
   };
 
   useEffect(() => {
@@ -313,6 +341,9 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
           onStartPolling={handleStartPolling}
           onStopPolling={handleStopPolling}
           disabled={!isConnected}
+          requests={requests}
+          selectedRequests={selectedRequests}
+          onRequestSelectionChange={handleRequestSelectionChange}
         />
       </div>
 
