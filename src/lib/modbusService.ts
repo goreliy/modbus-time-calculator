@@ -1,33 +1,16 @@
+import { ModbusBackendServiceImpl } from './modbusBackend';
 import { SavedModbusRequest, SavedModbusSettings } from './storage';
 
-export interface ModbusResponse {
-  error?: string;
-  request_hex?: string;
-  response_hex?: string;
-  timestamp: string;
-  parsed_data?: Array<number | boolean>;
-  formatted_data?: {
-    decimal: number[];
-    hex: string[];
-    binary: string[];
-  };
-}
-
-interface PollingOptions {
-  requests: SavedModbusRequest[];
-  interval: number;
-  cycles?: number;
-}
-
-class ModbusService {
+export class ModbusService {
   private static instance: ModbusService;
-  private baseUrl: string;
+  private backendService: ModbusBackendServiceImpl;
+  private pollingInterval: NodeJS.Timeout | null = null;
 
   private constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    this.backendService = ModbusBackendServiceImpl.getInstance();
   }
 
-  public static getInstance(): ModbusService {
+  static getInstance(): ModbusService {
     if (!ModbusService.instance) {
       ModbusService.instance = new ModbusService();
     }
@@ -35,120 +18,56 @@ class ModbusService {
   }
 
   async getAvailablePorts(): Promise<string[]> {
-    console.log('Fetching available ports from:', `${this.baseUrl}/ports`);
-    const response = await fetch(`${this.baseUrl}/ports`);
-    if (!response.ok) {
-      console.error('Failed to get ports:', response.status, response.statusText);
-      throw new Error('Failed to get available ports');
-    }
-    const data = await response.json();
-    console.log('Received ports:', data);
-    return data.ports;
+    return this.backendService.getAvailablePorts();
   }
 
   async connect(settings: SavedModbusSettings): Promise<boolean> {
-    console.log('Connecting with settings:', settings);
-    const response = await fetch(`${this.baseUrl}/connect`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        port: settings.port,
-        baudRate: settings.baudRate,
-        parity: settings.parity,
-        stopBits: settings.stopBits,
-        dataBits: settings.dataBits,
-        timeout: settings.timeout / 1000 // Convert to seconds for backend
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      console.error('Connection failed:', errorData);
-      throw new Error(`Failed to connect: ${errorData.detail}`);
-    }
-
-    const result = await response.json();
-    return result.success;
+    return this.backendService.connect(settings);
   }
 
   async disconnect(): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/disconnect`, {
-      method: 'POST',
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to disconnect');
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
     }
+    return this.backendService.disconnect();
   }
 
-  async sendRequest(request: SavedModbusRequest): Promise<ModbusResponse> {
-    console.log('Sending request:', request);
-    const response = await fetch(`${this.baseUrl}/request`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: request.name,
-        function: request.function,
-        startAddress: request.startAddress,
-        count: request.count,
-        slaveId: request.slaveId,
-        data: request.data,
-        comment: request.comment,
-        order: request.order,
-        delay_after: request.delay_after || 0.1,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to send request');
-    }
-
-    return response.json();
+  async sendRequest(request: SavedModbusRequest): Promise<any> {
+    return this.backendService.sendRequest(request);
   }
 
-  async startPolling(options: PollingOptions): Promise<void> {
-    console.log('Starting polling with options:', options);
-    const response = await fetch(`${this.baseUrl}/start-polling`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        requests: options.requests.map(req => ({
-          name: req.name,
-          function: req.function,
-          startAddress: req.startAddress,
-          count: req.count,
-          slaveId: req.slaveId,
-          data: req.data,
-          comment: req.comment,
-          order: req.order,
-          delay_after: req.delay_after || 0.1,
-        })),
-        interval: options.interval,
-        cycles: options.cycles,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to start polling');
+  async startPolling(settings: { requests: SavedModbusRequest[]; interval: number; cycles?: number }): Promise<void> {
+    await this.backendService.startPolling(settings);
+    
+    // Start local polling for status updates
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
     }
+    
+    this.pollingInterval = setInterval(async () => {
+      try {
+        const status = await this.getPollingStatus();
+        console.log('Polling status update:', status);
+      } catch (error) {
+        console.error('Error updating polling status:', error);
+      }
+    }, 1000);
   }
 
   async stopPolling(): Promise<void> {
-    console.log('Stopping polling');
-    const response = await fetch(`${this.baseUrl}/stop-polling`, {
-      method: 'POST',
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to stop polling');
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
     }
+    return this.backendService.stopPolling();
+  }
+
+  async getPollingStatus(): Promise<any> {
+    const response = await fetch('http://localhost:8000/polling-status');
+    if (!response.ok) {
+      throw new Error('Failed to get polling status');
+    }
+    return response.json();
   }
 }
-
-export { ModbusService };

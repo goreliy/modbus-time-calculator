@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 import uvicorn
 from modbus_handler import ModbusHandler, ModbusSettings, ModbusRequest
 import threading
@@ -18,6 +18,11 @@ app.add_middleware(
 
 modbus_handler = ModbusHandler()
 polling_thread = None
+polling_status = {
+    "is_polling": False,
+    "stats": {},
+    "selected_requests": []
+}
 
 class ConnectionSettings(BaseModel):
     connectionType: str = 'serial'
@@ -105,9 +110,14 @@ async def send_request(request: ModbusRequestModel):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/polling-status")
+async def get_polling_status():
+    global polling_status
+    return polling_status
+
 @app.post("/start-polling")
 async def start_polling(settings: PollingSettings):
-    global polling_thread
+    global polling_thread, polling_status
     try:
         if polling_thread and polling_thread.is_alive():
             modbus_handler.stop_polling()
@@ -127,6 +137,10 @@ async def start_polling(settings: PollingSettings):
             ) for req in settings.requests
         ]
 
+        polling_status["is_polling"] = True
+        polling_status["selected_requests"] = [req.name for req in settings.requests]
+        polling_status["stats"] = {}
+
         polling_thread = threading.Thread(
             target=modbus_handler.start_polling,
             args=(requests, settings.interval, settings.cycles)
@@ -134,15 +148,17 @@ async def start_polling(settings: PollingSettings):
         polling_thread.start()
         return {"success": True}
     except Exception as e:
+        polling_status["is_polling"] = False
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/stop-polling")
 async def stop_polling():
-    global polling_thread
+    global polling_thread, polling_status
     try:
         if polling_thread and polling_thread.is_alive():
             modbus_handler.stop_polling()
             polling_thread.join()
+        polling_status["is_polling"] = False
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

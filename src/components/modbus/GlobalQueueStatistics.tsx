@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Play, Square } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SavedModbusRequest } from '@/lib/storage';
+import { ModbusService } from '@/lib/modbusService';
 
 interface GlobalStats {
   totalRequests: number;
@@ -33,8 +34,30 @@ export const GlobalQueueStatistics = ({
   selectedRequests,
   onRequestSelectionChange
 }: GlobalQueueStatisticsProps) => {
-  console.log("Current stats:", stats);
-  console.log("Selected requests:", selectedRequests);
+  useEffect(() => {
+    const checkPollingStatus = async () => {
+      try {
+        const status = await ModbusService.getInstance().getPollingStatus();
+        if (status.is_polling) {
+          // Update local state to reflect backend polling status
+          stats.isPolling = true;
+          // Update selected requests if they exist in the status
+          if (status.selected_requests) {
+            status.selected_requests.forEach((requestName: string) => {
+              const request = requests.find(r => r.name === requestName);
+              if (request && !selectedRequests.includes(request.id)) {
+                onRequestSelectionChange(request.id, true);
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error checking polling status:', error);
+      }
+    };
+
+    checkPollingStatus();
+  }, []);
 
   return (
     <Card className="p-6 bg-gray-800/50 space-y-4 w-full">
@@ -93,6 +116,7 @@ export const GlobalQueueStatistics = ({
                 id={request.id}
                 checked={selectedRequests.includes(request.id)}
                 onCheckedChange={(checked) => onRequestSelectionChange(request.id, checked === true)}
+                disabled={stats.isPolling}
               />
               <label htmlFor={request.id} className="text-sm text-gray-300">
                 {request.name} ({request.function}, адрес: {request.startAddress})
