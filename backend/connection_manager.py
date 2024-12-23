@@ -11,7 +11,7 @@ class ModbusSettings:
     parity: str = 'N'
     stopbits: float = 1
     bytesize: int = 8
-    timeout: float = 1.0
+    timeout: float = 1000000  # microseconds (1 second)
     connection_type: str = 'serial'
     ip_address: Optional[str] = None
     tcp_port: Optional[int] = None
@@ -37,9 +37,12 @@ class ConnectionManager:
         try:
             self.disconnect()  # Always disconnect first
             
+            # Convert microseconds to seconds for serial/socket timeout
+            timeout_seconds = settings.timeout / 1_000_000
+            
             if settings.connection_type == 'tcp':
                 self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.tcp_socket.settimeout(settings.timeout)
+                self.tcp_socket.settimeout(timeout_seconds)
                 self.tcp_socket.connect((settings.ip_address, settings.tcp_port))
             else:
                 self.serial = serial.Serial(
@@ -48,7 +51,7 @@ class ConnectionManager:
                     parity=settings.parity,
                     stopbits=settings.stopbits,
                     bytesize=settings.bytesize,
-                    timeout=settings.timeout
+                    timeout=timeout_seconds  # pyserial uses seconds
                 )
             
             self._is_connected = True

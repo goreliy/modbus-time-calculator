@@ -22,6 +22,9 @@ export const ConnectionSettings = ({
   onSettingsChange,
   onConnect
 }: ConnectionSettingsProps) => {
+  // Convert microseconds to milliseconds for display
+  const displayTimeout = settings.timeout / 1000;
+
   return (
     <Card className="bg-gray-800/50 backdrop-blur border-gray-700/50 p-6">
       <h2 className="text-2xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
@@ -34,8 +37,8 @@ export const ConnectionSettings = ({
           <TabsTrigger value="tcp">TCP/IP</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="serial">
-          <div className="grid grid-cols-2 gap-4">
+      <TabsContent value="serial">
+        <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Port</Label>
               <Select
@@ -126,19 +129,22 @@ export const ConnectionSettings = ({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Timeout (ms)</Label>
-              <Input
-                type="number"
-                value={settings.timeout}
-                onChange={(e) => onSettingsChange({ ...settings, timeout: parseInt(e.target.value) })}
-                min={100}
-                max={5000}
-                disabled={isConnected}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Timeout (ms)</Label>
+            <Input
+              type="number"
+              value={displayTimeout}
+              onChange={(e) => onSettingsChange({ 
+                ...settings, 
+                timeout: parseInt(e.target.value) * 1000  // Convert ms to μs
+              })}
+              min={1}
+              max={5000}
+              disabled={isConnected}
+            />
           </div>
-        </TabsContent>
+        </div>
+      </TabsContent>
 
         <TabsContent value="tcp">
           <div className="grid grid-cols-2 gap-4">

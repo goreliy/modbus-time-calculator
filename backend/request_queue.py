@@ -21,7 +21,7 @@ class ModbusRequest:
     data: Optional[List[int]] = None
     comment: Optional[str] = None
     order: int = 0
-    delay_after: float = 0.1
+    delay_after: float = 100000  # microseconds (100ms default)
     cycles: Optional[int] = None
     stats: RequestStats = RequestStats()
 

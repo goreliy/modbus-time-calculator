@@ -34,6 +34,9 @@ const getCountExplanation = (functionCode: number): string => {
 };
 
 export const RequestForm = ({ request, onUpdate, disabled }: RequestFormProps) => {
+  // Convert microseconds to milliseconds for display
+  const displayDelay = request.delay_after ? request.delay_after / 1000 : 100;
+
   return (
     <div className="grid grid-cols-2 gap-4">
       <div className="space-y-2">
@@ -134,8 +137,10 @@ export const RequestForm = ({ request, onUpdate, disabled }: RequestFormProps) =
         <Label>Delay After Request (ms)</Label>
         <Input
           type="number"
-          value={request.delay_after ? request.delay_after * 1000 : 100}
-          onChange={(e) => onUpdate({ delay_after: parseInt(e.target.value) / 1000 })}
+          value={displayDelay}
+          onChange={(e) => onUpdate({ 
+            delay_after: parseInt(e.target.value) * 1000  // Convert ms to μs
+          })}
           disabled={disabled}
           min={0}
           max={10000}

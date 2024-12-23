@@ -31,7 +31,7 @@ class ConnectionSettings(BaseModel):
     parity: Optional[str] = None
     stopBits: Optional[float] = None
     dataBits: Optional[int] = None
-    timeout: float
+    timeout: float  # Now in microseconds
     ipAddress: Optional[str] = None
     tcpPort: Optional[int] = None
 
@@ -72,7 +72,7 @@ async def connect(settings: ConnectionSettings):
             parity=settings.parity,
             stopbits=settings.stopBits,
             bytesize=settings.dataBits,
-            timeout=settings.timeout,
+            timeout=settings.timeout,  # Already in microseconds from frontend
             connection_type=settings.connectionType,
             ip_address=settings.ipAddress,
             tcp_port=settings.tcpPort
@@ -113,7 +113,6 @@ async def send_request(request: ModbusRequestModel):
 @app.get("/polling-status")
 async def get_polling_status():
     global polling_status
-    # Update polling status from modbus handler
     is_polling = modbus_handler.is_polling()
     polling_status["is_polling"] = is_polling
     return polling_status
@@ -122,7 +121,6 @@ async def get_polling_status():
 async def start_polling(settings: PollingSettings):
     global polling_thread, polling_status
     try:
-        # Stop any existing polling
         if polling_thread and polling_thread.is_alive():
             modbus_handler.stop_polling()
             polling_thread.join()
