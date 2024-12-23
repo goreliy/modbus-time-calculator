@@ -17,6 +17,7 @@ export interface SavedModbusRequest {
   startAddress: number;
   count: number;
   slaveId: number;
+  data?: number[];  // Added this optional property
   comment?: string;
   order: number;
   cycles?: number;
