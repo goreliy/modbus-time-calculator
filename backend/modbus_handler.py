@@ -17,16 +17,19 @@ class ModbusHandler:
         self.request_queue = RequestQueue()
         self.connection = ConnectionManager()
         self._is_polling = False
+        self._stop_polling = threading.Event()
 
     def get_available_ports(self) -> list[str]:
         return self.connection.get_available_ports()
 
     def connect(self, settings: ModbusSettings) -> bool:
-        return self.connection.connect(settings)
+        with self._lock:
+            return self.connection.connect(settings)
 
     def disconnect(self) -> None:
-        self.stop_polling()  # Always stop polling before disconnecting
-        self.connection.disconnect()
+        with self._lock:
+            self.stop_polling()  # Always stop polling before disconnecting
+            self.connection.disconnect()
 
     def send_request(self, request: ModbusRequest) -> Dict:
         with self._lock:
@@ -187,26 +190,32 @@ class ModbusHandler:
     def start_polling(self, requests: list[ModbusRequest], interval: float, cycles: Optional[int] = None) -> None:
         print(f"Starting polling with interval {interval}s and {cycles if cycles is not None else 'infinite'} cycles")
         
-        # Stop any existing polling
-        self.stop_polling()
-        
-        # Initialize new polling
-        self.request_queue = RequestQueue()
-        self._is_polling = True
-        
-        # Add requests to queue
-        for request in requests:
-            self.request_queue.add_request(request, cycles)
-        
-        self._polling_thread = threading.Thread(target=self._polling_worker, args=(interval,))
-        self._polling_thread.start()
+        with self._lock:
+            # Stop any existing polling
+            self.stop_polling()
+            
+            # Initialize new polling
+            self.request_queue = RequestQueue()
+            self._is_polling = True
+            self._stop_polling.clear()
+            
+            # Add requests to queue
+            for request in requests:
+                self.request_queue.add_request(request, cycles)
+            
+            self._polling_thread = threading.Thread(target=self._polling_worker, args=(interval,))
+            self._polling_thread.daemon = True
+            self._polling_thread.start()
 
     def _polling_worker(self, interval: float) -> None:
-        while self._is_polling and self.connection.is_connected():
+        consecutive_errors = 0
+        max_consecutive_errors = 3  # Maximum number of consecutive errors before stopping
+
+        while not self._stop_polling.is_set() and self.connection.is_connected():
             request = self.request_queue.get_next_request()
             if not request:
                 if interval > 0:
-                    threading.Event().wait(interval)
+                    self._stop_polling.wait(interval)
                 continue
             
             try:
@@ -214,27 +223,43 @@ class ModbusHandler:
                 response = self.send_request(request)
                 print(f"Poll response for {request.name}: {response}")
                 
+                if 'error' in response:
+                    consecutive_errors += 1
+                    if consecutive_errors >= max_consecutive_errors:
+                        print(f"Stopping polling due to {max_consecutive_errors} consecutive errors")
+                        self.stop_polling()
+                        break
+                else:
+                    consecutive_errors = 0  # Reset error counter on successful request
+                
                 # For infinite polling, add the request back to the queue
                 if request.stats.total == 0:
                     self.request_queue.add_request(request)
                 
-                if self._is_polling and request.delay_after > 0:
-                    threading.Event().wait(request.delay_after)
+                if not self._stop_polling.is_set() and request.delay_after > 0:
+                    self._stop_polling.wait(request.delay_after / 1_000_000)  # Convert microseconds to seconds
                     
             except Exception as e:
                 print(f"Error during polling for {request.name}: {str(e)}")
                 request.stats.errors += 1
+                consecutive_errors += 1
+                if consecutive_errors >= max_consecutive_errors:
+                    print(f"Stopping polling due to {max_consecutive_errors} consecutive errors")
+                    self.stop_polling()
+                    break
                 continue
             
-            if self._is_polling and interval > 0:
-                threading.Event().wait(interval)
+            if not self._stop_polling.is_set() and interval > 0:
+                self._stop_polling.wait(interval)
 
     def stop_polling(self) -> None:
         print("Stopping polling...")
+        self._stop_polling.set()
         self._is_polling = False
         if self._polling_thread and self._polling_thread.is_alive():
-            self._polling_thread.join()
+            self._polling_thread.join(timeout=1.0)
         self.request_queue.clear()
+        print("Polling stopped")
 
     def is_polling(self) -> bool:
         return self._is_polling
