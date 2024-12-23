@@ -18,15 +18,6 @@ interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
 }
 
-interface RequestData {
-  timestamp: string;
-  values: {
-    decimal: number[];
-    hex: string[];
-    binary: string[];
-  };
-}
-
 export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   const [requestData, setRequestData] = useState<Record<string, RequestData[]>>({});
   const [chartData, setChartData] = useState<Array<{ timestamp: number; value: number }>>([]);
@@ -298,7 +289,10 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     <div className="space-y-6 relative">
       {isLoading && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 rounded-lg">
-          <Loader2 className="animate-spin h-8 w-8 text-white" />
+          <div className="bg-gray-800 p-4 rounded-lg flex items-center gap-2">
+            <Loader2 className="animate-spin h-8 w-8 text-white" />
+            <span className="text-white">Processing...</span>
+          </div>
         </div>
       )}
       
