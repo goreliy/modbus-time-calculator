@@ -1,5 +1,5 @@
 import { ModbusBackendServiceImpl } from './modbusBackend';
-import { SavedModbusRequest, SavedModbusSettings } from './storage';
+import { SavedModbusSettings, SavedModbusRequest } from './storage';
 
 export class ModbusService {
   private static instance: ModbusService;
@@ -22,7 +22,17 @@ export class ModbusService {
   }
 
   async connect(settings: SavedModbusSettings): Promise<boolean> {
-    return this.backendService.connect(settings);
+    // Ensure all required fields are present before connecting
+    const validatedSettings = {
+      ...settings,
+      baudRate: settings.baudRate || 9600,
+      parity: settings.parity || 'N',
+      stopBits: settings.stopBits || 1,
+      dataBits: settings.dataBits || 8,
+      timeout: settings.timeout || 10000,
+      connectionType: settings.connectionType || 'serial'
+    };
+    return this.backendService.connect(validatedSettings);
   }
 
   async disconnect(): Promise<void> {

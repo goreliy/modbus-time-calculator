@@ -1,11 +1,11 @@
 export interface SavedModbusSettings {
   port: string;
-  baudRate?: number;
-  parity?: string;
-  stopBits?: number;
-  dataBits?: number;
+  baudRate: number;  // Made required
+  parity: 'N' | 'E' | 'O';  // Made strict
+  stopBits: number;
+  dataBits: number;
   timeout: number;  // in microseconds
-  connectionType?: string;
+  connectionType: 'serial' | 'tcp';  // Made strict
   ipAddress?: string;
   tcpPort?: number;
 }
@@ -19,12 +19,15 @@ export interface SavedModbusRequest {
   slaveId: number;
   data?: number[];
   comment?: string;
-  order?: number;
+  order: number;
   cycles?: number;
   delay_after: number;  // in microseconds
 }
 
-const DEFAULT_SETTINGS: SavedModbusSettings = {
+const SETTINGS_KEY = 'modbusSettings';
+const REQUESTS_KEY = 'modbusRequests';
+
+export const DEFAULT_SETTINGS: SavedModbusSettings = {
   port: '',
   baudRate: 9600,
   parity: 'N',
@@ -34,15 +37,20 @@ const DEFAULT_SETTINGS: SavedModbusSettings = {
   connectionType: 'serial'
 };
 
-const loadSettings = (): SavedModbusSettings => {
-  // Load settings from local storage or return default settings
-  const settings = localStorage.getItem('modbusSettings');
+export const saveSettings = (settings: SavedModbusSettings): void => {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+};
+
+export const loadSettings = (): SavedModbusSettings => {
+  const settings = localStorage.getItem(SETTINGS_KEY);
   return settings ? JSON.parse(settings) : DEFAULT_SETTINGS;
 };
 
-const saveSettings = (settings: SavedModbusSettings) => {
-  // Save settings to local storage
-  localStorage.setItem('modbusSettings', JSON.stringify(settings));
+export const saveRequests = (requests: SavedModbusRequest[]): void => {
+  localStorage.setItem(REQUESTS_KEY, JSON.stringify(requests));
 };
 
-export { DEFAULT_SETTINGS, loadSettings, saveSettings };
+export const loadRequests = (): SavedModbusRequest[] => {
+  const saved = localStorage.getItem(REQUESTS_KEY);
+  return saved ? JSON.parse(saved) : [];
+};

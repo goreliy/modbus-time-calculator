@@ -47,7 +47,8 @@ export const ModbusRequestManager = ({
       slaveId: 1,
       comment: '',
       order: requests.length,
-      cycles: 1
+      cycles: 1,
+      delay_after: 100000  // 100ms default delay
     };
     onRequestsChange([...requests, newRequest]);
   };

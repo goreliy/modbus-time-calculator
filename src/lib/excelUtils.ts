@@ -19,7 +19,7 @@ export const saveToExcel = (settings: SavedModbusSettings, requests: SavedModbus
 
   // Save requests
   const requestsData = [
-    ['Name', 'Function', 'Start Address', 'Count', 'Slave ID', 'Comment', 'Order']
+    ['Name', 'Function', 'Start Address', 'Count', 'Slave ID', 'Comment', 'Order', 'Delay After']
   ];
   requests.forEach(req => {
     requestsData.push([
@@ -29,7 +29,8 @@ export const saveToExcel = (settings: SavedModbusSettings, requests: SavedModbus
       req.count.toString(),
       req.slaveId.toString(),
       req.comment || '',
-      req.order.toString()
+      req.order.toString(),
+      req.delay_after.toString()
     ]);
   });
   const requestsSheet = XLSX.utils.aoa_to_sheet(requestsData);
@@ -40,7 +41,7 @@ export const saveToExcel = (settings: SavedModbusSettings, requests: SavedModbus
 };
 
 export const loadFromExcel = async (file: File): Promise<{
-  settings: Partial<SavedModbusSettings>;
+  settings: SavedModbusSettings;
   requests: SavedModbusRequest[];
 }> => {
   return new Promise((resolve, reject) => {
@@ -53,7 +54,17 @@ export const loadFromExcel = async (file: File): Promise<{
         // Parse settings
         const settingsSheet = workbook.Sheets['Settings'];
         const settingsData = XLSX.utils.sheet_to_json(settingsSheet, { header: 1 });
-        const settings: Partial<SavedModbusSettings> = {};
+        const settings: SavedModbusSettings = {
+          ...DEFAULT_SETTINGS,
+          port: '',
+          baudRate: 9600,
+          parity: 'N',
+          stopBits: 1,
+          dataBits: 8,
+          timeout: 10000,
+          connectionType: 'serial'
+        };
+        
         settingsData.slice(1).forEach((row: any[]) => {
           if (row[0] === 'Port') settings.port = row[1];
           if (row[0] === 'Baud Rate') settings.baudRate = parseInt(row[1]);
@@ -74,7 +85,8 @@ export const loadFromExcel = async (file: File): Promise<{
           count: parseInt(row['Count']),
           slaveId: parseInt(row['Slave ID']),
           comment: row['Comment'],
-          order: parseInt(row['Order'])
+          order: parseInt(row['Order']),
+          delay_after: parseInt(row['Delay After'] || '100000')  // Default 100ms if not specified
         }));
 
         resolve({ settings, requests });
