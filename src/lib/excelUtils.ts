@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { SavedModbusSettings, SavedModbusRequest } from './storage';
+import { SavedModbusSettings, SavedModbusRequest, DEFAULT_SETTINGS } from './storage';
 
 export const saveToExcel = (settings: SavedModbusSettings, requests: SavedModbusRequest[]) => {
   const workbook = XLSX.utils.book_new();
@@ -12,7 +12,10 @@ export const saveToExcel = (settings: SavedModbusSettings, requests: SavedModbus
     ['Parity', settings.parity],
     ['Stop Bits', settings.stopBits.toString()],
     ['Data Bits', settings.dataBits.toString()],
-    ['Timeout', settings.timeout.toString()]
+    ['Timeout', settings.timeout.toString()],
+    ['Connection Type', settings.connectionType],
+    ['IP Address', settings.ipAddress || ''],
+    ['TCP Port', settings.tcpPort?.toString() || '']
   ];
   const settingsSheet = XLSX.utils.aoa_to_sheet(settingsData);
   XLSX.utils.book_append_sheet(workbook, settingsSheet, 'Settings');
@@ -41,8 +44,8 @@ export const saveToExcel = (settings: SavedModbusSettings, requests: SavedModbus
 };
 
 export const loadFromExcel = async (file: File): Promise<{
-  settings: SavedModbusSettings;
-  requests: SavedModbusRequest[];
+  settings?: SavedModbusSettings;
+  requests?: SavedModbusRequest[];
 }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -54,16 +57,7 @@ export const loadFromExcel = async (file: File): Promise<{
         // Parse settings
         const settingsSheet = workbook.Sheets['Settings'];
         const settingsData = XLSX.utils.sheet_to_json(settingsSheet, { header: 1 });
-        const settings: SavedModbusSettings = {
-          ...DEFAULT_SETTINGS,
-          port: '',
-          baudRate: 9600,
-          parity: 'N',
-          stopBits: 1,
-          dataBits: 8,
-          timeout: 10000,
-          connectionType: 'serial'
-        };
+        const settings: SavedModbusSettings = { ...DEFAULT_SETTINGS };
         
         settingsData.slice(1).forEach((row: any[]) => {
           if (row[0] === 'Port') settings.port = row[1];
@@ -72,6 +66,9 @@ export const loadFromExcel = async (file: File): Promise<{
           if (row[0] === 'Stop Bits') settings.stopBits = parseFloat(row[1]);
           if (row[0] === 'Data Bits') settings.dataBits = parseInt(row[1]);
           if (row[0] === 'Timeout') settings.timeout = parseInt(row[1]);
+          if (row[0] === 'Connection Type') settings.connectionType = row[1] as 'serial' | 'tcp';
+          if (row[0] === 'IP Address') settings.ipAddress = row[1];
+          if (row[0] === 'TCP Port') settings.tcpPort = row[1] ? parseInt(row[1]) : undefined;
         });
 
         // Parse requests

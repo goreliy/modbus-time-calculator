@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ModbusService } from '@/lib/modbusService';
-import { SavedModbusSettings, SavedModbusRequest } from '@/lib/storage';
+import { SavedModbusSettings, SavedModbusRequest, saveSettings, loadSettings } from '@/lib/storage';
 import { toast } from 'sonner';
 import { ConnectionSettings } from './modbus/ConnectionSettings';
 import { ModbusRequestManager } from './ModbusRequestManager';
@@ -37,7 +37,8 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     parity: 'N',
     stopBits: 1,
     dataBits: 8,
-    timeout: 10000  // Default timeout 10000 microseconds (0.01 seconds)
+    timeout: 10000,  // Default timeout 10000 microseconds (0.01 seconds)
+    connectionType: 'serial'
   });
   
   const [isConnected, setIsConnected] = useState(false);

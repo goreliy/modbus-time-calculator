@@ -1,11 +1,11 @@
 export interface SavedModbusSettings {
   port: string;
-  baudRate: number;  // Made required
-  parity: 'N' | 'E' | 'O';  // Made strict
+  baudRate: number;
+  parity: 'N' | 'E' | 'O';
   stopBits: number;
   dataBits: number;
   timeout: number;  // in microseconds
-  connectionType: 'serial' | 'tcp';  // Made strict
+  connectionType: 'serial' | 'tcp';
   ipAddress?: string;
   tcpPort?: number;
 }
@@ -17,15 +17,11 @@ export interface SavedModbusRequest {
   startAddress: number;
   count: number;
   slaveId: number;
-  data?: number[];
   comment?: string;
   order: number;
   cycles?: number;
   delay_after: number;  // in microseconds
 }
-
-const SETTINGS_KEY = 'modbusSettings';
-const REQUESTS_KEY = 'modbusRequests';
 
 export const DEFAULT_SETTINGS: SavedModbusSettings = {
   port: '',
@@ -36,6 +32,9 @@ export const DEFAULT_SETTINGS: SavedModbusSettings = {
   timeout: 10000,  // 10000 microseconds (0.01 seconds)
   connectionType: 'serial'
 };
+
+const SETTINGS_KEY = 'modbusSettings';
+const REQUESTS_KEY = 'modbusRequests';
 
 export const saveSettings = (settings: SavedModbusSettings): void => {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
