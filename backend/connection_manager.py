@@ -13,7 +13,7 @@ class ModbusSettings:
     parity: str = 'N'
     stopbits: float = 1
     bytesize: int = 8
-    timeout: float = 1000000  # microseconds (1 second)
+    timeout: float = 10000  # microseconds (0.01 second default)
     connection_type: str = 'serial'
     ip_address: Optional[str] = None
     tcp_port: Optional[int] = None

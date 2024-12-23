@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ModbusService } from '@/lib/modbusService';
-import { SavedModbusSettings, SavedModbusRequest, saveSettings, loadSettings } from '@/lib/storage';
+import { SavedModbusSettings, SavedModbusRequest } from '@/lib/storage';
 import { toast } from 'sonner';
 import { ConnectionSettings } from './modbus/ConnectionSettings';
 import { ModbusRequestManager } from './ModbusRequestManager';
@@ -18,6 +18,15 @@ interface ModbusConnectionProps {
   onDataReceived?: (data: Array<number | boolean>) => void;
 }
 
+interface RequestData {
+  timestamp: string;
+  values: {
+    decimal: number[];
+    hex: string[];
+    binary: string[];
+  };
+}
+
 export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
   const [requestData, setRequestData] = useState<Record<string, RequestData[]>>({});
   const [chartData, setChartData] = useState<Array<{ timestamp: number; value: number }>>([]);
@@ -28,8 +37,9 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     parity: 'N',
     stopBits: 1,
     dataBits: 8,
-    timeout: 1000
+    timeout: 10000  // Default timeout 10000 microseconds (0.01 seconds)
   });
+  
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [lastResponse, setLastResponse] = useState<any>(null);
