@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SavedModbusRequest } from '@/lib/storage';
 import { ModbusService } from '@/lib/modbusService';
 import { toast } from 'sonner';
+import { Input } from "@/components/ui/input";
 
 interface GlobalStats {
   totalRequests: number;
@@ -136,16 +137,27 @@ export const GlobalQueueStatistics = ({
         <h3 className="text-lg font-semibold mb-3">Выбор запросов для очереди</h3>
         <div className="space-y-2">
           {requests.map((request) => (
-            <div key={request.id} className="flex items-center space-x-2">
+            <div key={request.id} className="flex items-center space-x-4">
               <Checkbox
                 id={request.id}
                 checked={selectedRequests.includes(request.id)}
                 onCheckedChange={(checked) => onRequestSelectionChange(request.id, checked === true)}
                 disabled={stats.isPolling}
               />
-              <label htmlFor={request.id} className="text-sm text-gray-300">
+              <label htmlFor={request.id} className="text-sm text-gray-300 flex-grow">
                 {request.name} ({request.function}, адрес: {request.startAddress})
               </label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="Количество циклов"
+                className="w-32"
+                onChange={(e) => {
+                  const cycles = parseInt(e.target.value);
+                  request.cycles = cycles > 0 ? cycles : undefined;
+                }}
+                disabled={stats.isPolling}
+              />
             </div>
           ))}
         </div>
