@@ -37,7 +37,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     parity: 'N',
     stopBits: 1,
     dataBits: 8,
-    timeout: 10000,  // Default timeout 10000 microseconds (0.01 seconds)
+    timeout: 10000,
     connectionType: 'serial'
   });
   
@@ -59,6 +59,7 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
     timeoutRequests: 0,
     errorRequests: 0,
     remainingRequests: 0,
+    startedRequests: 0, // Added the missing property
     isPolling: false
   });
 
@@ -291,7 +292,8 @@ export const ModbusConnection = ({ onDataReceived }: ModbusConnectionProps) => {
         completedRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.completed || 0), 0),
         timeoutRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.timeouts || 0), 0),
         errorRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.errors || 0), 0),
-        remainingRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.remaining || 0), 0)
+        remainingRequests: requests.reduce((sum, req) => sum + (lastResponse?.stats?.[req.id]?.remaining || 0), 0),
+        startedRequests: lastResponse?.stats?.started_requests || 0
       }));
     }
   }, [lastResponse?.stats, requests]);
