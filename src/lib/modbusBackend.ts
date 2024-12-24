@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000';
+import { API_BASE_URL, DEFAULT_TIMEOUT } from '../config/api';
 
 export interface ModbusSettings {
   port: string;
@@ -47,9 +46,17 @@ export interface ModbusBackendService {
 
 export class ModbusBackendServiceImpl implements ModbusBackendService {
   private static instance: ModbusBackendServiceImpl;
+  private axiosInstance;
 
   private constructor() {
     console.log('ModbusBackendService initialized');
+    this.axiosInstance = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: DEFAULT_TIMEOUT,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
   }
 
   static getInstance(): ModbusBackendServiceImpl {
@@ -61,38 +68,39 @@ export class ModbusBackendServiceImpl implements ModbusBackendService {
 
   async getAvailablePorts(): Promise<string[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ports`);
+      const response = await this.axiosInstance.get('/ports');
       console.log('Available ports:', response.data);
       return response.data.ports;
     } catch (error) {
       console.error('Error getting ports:', error);
-      return [];
+      throw error;
     }
   }
 
   async connect(settings: ModbusSettings): Promise<boolean> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/connect`, settings);
+      const response = await this.axiosInstance.post('/connect', settings);
       console.log('Connection response:', response.data);
       return response.data.success;
     } catch (error) {
       console.error('Connection error:', error);
-      return false;
+      throw error;
     }
   }
 
   async disconnect(): Promise<void> {
     try {
-      await axios.post(`${API_BASE_URL}/disconnect`);
+      await this.axiosInstance.post('/disconnect');
       console.log('Disconnected successfully');
     } catch (error) {
       console.error('Disconnect error:', error);
+      throw error;
     }
   }
 
   async sendRequest(request: ModbusRequest): Promise<ModbusResponse> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/request`, request);
+      const response = await this.axiosInstance.post('/request', request);
       console.log('Modbus response:', response.data);
       return response.data;
     } catch (error) {
@@ -103,7 +111,7 @@ export class ModbusBackendServiceImpl implements ModbusBackendService {
 
   async startPolling(settings: PollingSettings): Promise<void> {
     try {
-      await axios.post(`${API_BASE_URL}/start-polling`, settings);
+      await this.axiosInstance.post('/start-polling', settings);
       console.log('Polling started');
     } catch (error) {
       console.error('Start polling error:', error);
@@ -113,7 +121,7 @@ export class ModbusBackendServiceImpl implements ModbusBackendService {
 
   async stopPolling(): Promise<void> {
     try {
-      await axios.post(`${API_BASE_URL}/stop-polling`);
+      await this.axiosInstance.post('/stop-polling');
       console.log('Polling stopped');
     } catch (error) {
       console.error('Stop polling error:', error);
