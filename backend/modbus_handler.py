@@ -18,6 +18,8 @@ class ModbusHandler:
         self.connection = ConnectionManager()
         self._is_polling = False
         self._stop_polling = threading.Event()
+        self._stop_timeout = threading.Event()
+        self._started_requests = 0
 
     def get_available_ports(self) -> list[str]:
         return self.connection.get_available_ports()
@@ -198,6 +200,7 @@ class ModbusHandler:
             self.request_queue = RequestQueue()
             self._is_polling = True
             self._stop_polling.clear()
+            self._started_requests = 0
             
             # Add requests to queue
             for request in requests:
@@ -219,6 +222,7 @@ class ModbusHandler:
                 continue
             
             try:
+                self._started_requests += 1
                 print(f"Executing request {request.name}")
                 response = self.send_request(request)
                 print(f"Poll response for {request.name}: {response}")
@@ -237,7 +241,9 @@ class ModbusHandler:
                     self.request_queue.add_request(request)
                 
                 if not self._stop_polling.is_set() and request.delay_after > 0:
-                    self._stop_polling.wait(request.delay_after / 1_000_000)  # Convert microseconds to seconds
+                    # Use stop_timeout event for delay
+                    self._stop_timeout.clear()
+                    self._stop_timeout.wait(request.delay_after / 1_000_000)  # Convert microseconds to seconds
                     
             except Exception as e:
                 print(f"Error during polling for {request.name}: {str(e)}")
@@ -250,16 +256,33 @@ class ModbusHandler:
                 continue
             
             if not self._stop_polling.is_set() and interval > 0:
-                self._stop_polling.wait(interval)
+                # Use stop_timeout event for interval
+                self._stop_timeout.clear()
+                self._stop_timeout.wait(interval)
 
     def stop_polling(self) -> None:
         print("Stopping polling...")
         self._stop_polling.set()
+        self._stop_timeout.set()  # Also stop any current timeout
         self._is_polling = False
         if self._polling_thread and self._polling_thread.is_alive():
             self._polling_thread.join(timeout=1.0)
         self.request_queue.clear()
+        self._started_requests = 0
         print("Polling stopped")
+
+    def stop_current_timeout(self) -> None:
+        """Stop waiting for the current timeout."""
+        self._stop_timeout.set()
+        print("Timeout wait stopped")
+
+    def get_stats(self) -> Dict:
+        """Get current polling statistics."""
+        return {
+            "is_polling": self._is_polling,
+            "started_requests": self._started_requests,
+            "queue_stats": self.request_queue.get_stats()
+        }
 
     def is_polling(self) -> bool:
         return self._is_polling

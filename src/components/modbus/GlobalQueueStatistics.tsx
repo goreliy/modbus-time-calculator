@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Square } from "lucide-react";
+import { Play, Square, StopCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SavedModbusRequest } from '@/lib/storage';
 import { ModbusService } from '@/lib/modbusService';
+import { toast } from 'sonner';
 
 interface GlobalStats {
   totalRequests: number;
@@ -12,6 +13,7 @@ interface GlobalStats {
   timeoutRequests: number;
   errorRequests: number;
   remainingRequests: number;
+  startedRequests: number;
   isPolling: boolean;
 }
 
@@ -39,9 +41,7 @@ export const GlobalQueueStatistics = ({
       try {
         const status = await ModbusService.getInstance().getPollingStatus();
         if (status.is_polling) {
-          // Update local state to reflect backend polling status
           stats.isPolling = true;
-          // Update selected requests if they exist in the status
           if (status.selected_requests) {
             status.selected_requests.forEach((requestName: string) => {
               const request = requests.find(r => r.name === requestName);
@@ -59,35 +59,60 @@ export const GlobalQueueStatistics = ({
     checkPollingStatus();
   }, []);
 
+  const handleStopTimeout = async () => {
+    try {
+      await ModbusService.getInstance().stopCurrentTimeout();
+      toast.success('Текущий таймаут остановлен');
+    } catch (error) {
+      console.error('Error stopping timeout:', error);
+      toast.error('Ошибка при остановке таймаута');
+    }
+  };
+
   return (
     <Card className="p-6 bg-gray-800/50 space-y-4 w-full">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
           Статистика очереди запросов
         </h2>
-        <Button
-          className={`${stats.isPolling ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} min-w-[120px]`}
-          onClick={stats.isPolling ? onStopPolling : onStartPolling}
-          disabled={disabled || selectedRequests.length === 0}
-        >
-          {stats.isPolling ? (
-            <>
-              <Square className="mr-2 h-4 w-4" />
-              Стоп
-            </>
-          ) : (
-            <>
-              <Play className="mr-2 h-4 w-4" />
-              Старт
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleStopTimeout}
+            disabled={disabled || !stats.isPolling}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white"
+          >
+            <StopCircle className="mr-2 h-4 w-4" />
+            Стоп таймаут
+          </Button>
+          <Button
+            className={`${stats.isPolling ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} min-w-[120px]`}
+            onClick={stats.isPolling ? onStopPolling : onStartPolling}
+            disabled={disabled || selectedRequests.length === 0}
+          >
+            {stats.isPolling ? (
+              <>
+                <Square className="mr-2 h-4 w-4" />
+                Стоп
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4" />
+                Старт
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-4 mb-4">
+      <div className="grid grid-cols-6 gap-4 mb-4">
         <div className="bg-gray-700/30 p-4 rounded-lg">
           <div className="text-gray-400 text-sm mb-1">Всего запросов</div>
           <div className="text-2xl font-bold text-white">{stats.totalRequests}</div>
+        </div>
+        <div className="bg-gray-700/30 p-4 rounded-lg">
+          <div className="text-gray-400 text-sm mb-1">Стартовало</div>
+          <div className="text-2xl font-bold text-purple-400">{stats.startedRequests}</div>
         </div>
         <div className="bg-gray-700/30 p-4 rounded-lg">
           <div className="text-gray-400 text-sm mb-1">Успешных</div>

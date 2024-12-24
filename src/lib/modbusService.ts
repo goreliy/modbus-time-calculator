@@ -33,6 +33,32 @@ export class ModbusService {
     return null;
   }
 
+  async stopCurrentTimeout(): Promise<void> {
+    try {
+      if (!this.isBackendAvailable) {
+        toast.error('Cannot stop timeout: Modbus server is not available');
+        return;
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/stop-timeout`, {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.success) {
+        console.log('Timeout stopped successfully');
+      } else {
+        throw new Error('Failed to stop timeout');
+      }
+    } catch (error) {
+      return this.handleNetworkError(error, 'stopping timeout');
+    }
+  }
+
   async getAvailablePorts(): Promise<string[]> {
     try {
       if (!this.isBackendAvailable) {

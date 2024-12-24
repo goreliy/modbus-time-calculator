@@ -21,7 +21,8 @@ polling_thread = None
 polling_status = {
     "is_polling": False,
     "stats": {},
-    "selected_requests": []
+    "selected_requests": [],
+    "started_requests": 0
 }
 
 class ConnectionSettings(BaseModel):
@@ -110,11 +111,21 @@ async def send_request(request: ModbusRequestModel):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/stop-timeout")
+async def stop_timeout():
+    try:
+        modbus_handler.stop_current_timeout()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/polling-status")
 async def get_polling_status():
     global polling_status
-    is_polling = modbus_handler.is_polling()
+    stats = modbus_handler.get_stats()
+    is_polling = stats["is_polling"]
     polling_status["is_polling"] = is_polling
+    polling_status["started_requests"] = stats["started_requests"]
     return polling_status
 
 @app.post("/start-polling")
