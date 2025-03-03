@@ -1,3 +1,4 @@
+
 import { ModbusBackendServiceImpl } from './modbusBackend';
 import { SavedModbusSettings, SavedModbusRequest } from './storage';
 import { toast } from 'sonner';
@@ -8,6 +9,7 @@ export class ModbusService {
   private backendService: ModbusBackendServiceImpl;
   private pollingInterval: NodeJS.Timeout | null = null;
   private isBackendAvailable: boolean = true;
+  private lastErrorShown: number = 0;
 
   private constructor() {
     this.backendService = ModbusBackendServiceImpl.getInstance();
@@ -24,10 +26,16 @@ export class ModbusService {
     console.error(`Network error in ${context}:`, error);
     this.isBackendAvailable = false;
     
-    if (error.message === 'Failed to fetch' || error.code === 'ECONNREFUSED') {
-      toast.error('Cannot connect to Modbus server. Please ensure the backend is running.');
-    } else {
-      toast.error(`Error in ${context}: ${error.message}`);
+    // Only show toast error once every 10 seconds to avoid spamming
+    const now = Date.now();
+    if (now - this.lastErrorShown > 10000) {
+      this.lastErrorShown = now;
+      
+      if (error.message === 'Failed to fetch' || error.code === 'ECONNREFUSED') {
+        toast.error('Cannot connect to Modbus server. Please ensure the backend is running.');
+      } else {
+        toast.error(`Error in ${context}: ${error.message}`);
+      }
     }
     
     return null;
@@ -139,6 +147,8 @@ export class ModbusService {
         try {
           const status = await this.getPollingStatus();
           console.log('Polling status update:', status);
+          // If we got a successful response, mark the backend as available
+          this.isBackendAvailable = true;
         } catch (error) {
           console.error('Error updating polling status:', error);
         }
@@ -168,11 +178,30 @@ export class ModbusService {
         return { is_polling: false, error: 'Backend not available' };
       }
       
-      const response = await fetch(`${API_BASE_URL}/polling-status`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/polling-status`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        // If we successfully got the data, mark the backend as available
+        this.isBackendAvailable = true;
+        return data;
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          throw new Error('Request timed out');
+        }
+        throw err;
       }
-      return await response.json();
     } catch (error) {
       return this.handleNetworkError(error, 'getting polling status');
     }

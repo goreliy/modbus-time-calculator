@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Square, StopCircle } from "lucide-react";
+import { Play, Square, StopCircle, Server } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SavedModbusRequest } from '@/lib/storage';
 import { ModbusService } from '@/lib/modbusService';
@@ -37,11 +38,13 @@ export const GlobalQueueStatistics = ({
   selectedRequests,
   onRequestSelectionChange
 }: GlobalQueueStatisticsProps) => {
+  const [isServerAvailable, setIsServerAvailable] = useState(true);
+
   useEffect(() => {
     const checkPollingStatus = async () => {
       try {
         const status = await ModbusService.getInstance().getPollingStatus();
-        if (status.is_polling) {
+        if (status && status.is_polling) {
           stats.isPolling = true;
           if (status.selected_requests) {
             status.selected_requests.forEach((requestName: string) => {
@@ -51,9 +54,11 @@ export const GlobalQueueStatistics = ({
               }
             });
           }
+          setIsServerAvailable(true);
         }
       } catch (error) {
         console.error('Error checking polling status:', error);
+        setIsServerAvailable(false);
       }
     };
 
@@ -76,11 +81,17 @@ export const GlobalQueueStatistics = ({
         <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
           Статистика очереди запросов
         </h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {!isServerAvailable && (
+            <div className="px-3 py-1 bg-red-800/50 rounded-lg text-red-300 flex items-center gap-1 text-sm">
+              <Server size={16} />
+              Сервер недоступен
+            </div>
+          )}
           <Button
             variant="outline"
             onClick={handleStopTimeout}
-            disabled={disabled || !stats.isPolling}
+            disabled={disabled || !stats.isPolling || !isServerAvailable}
             className="bg-yellow-500 hover:bg-yellow-600 text-white"
           >
             <StopCircle className="mr-2 h-4 w-4" />
@@ -89,7 +100,7 @@ export const GlobalQueueStatistics = ({
           <Button
             className={`${stats.isPolling ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} min-w-[120px]`}
             onClick={stats.isPolling ? onStopPolling : onStartPolling}
-            disabled={disabled || selectedRequests.length === 0}
+            disabled={disabled || selectedRequests.length === 0 || !isServerAvailable}
           >
             {stats.isPolling ? (
               <>
